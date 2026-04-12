@@ -2,15 +2,17 @@
   "name": "model-shop",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev:server": "nodemon server/src/server.js",
-    "start:server": "node server/src/server.js",
-    "dev:customer": "npm run dev --workspace client-customer",
-    "dev:admin": "npm run dev --workspace client-admin"
-  },
   "workspaces": [
     "server",
     "client-customer",
     "client-admin"
-  ]
+  ],
+  "scripts": {
+    "build:customer": "npm run build --workspace client-customer",
+    "build:admin": "npm run build --workspace client-admin",
+    "copy:customer": "mkdir -p server/public/customer && cp -r client-customer/dist/* server/public/customer/",
+    "copy:admin": "mkdir -p server/public/admin && cp -r client-admin/dist/* server/public/admin/",
+    "build": "npm run build:customer && npm run build:admin && npm run copy:customer && npm run copy:admin",
+    "start": "node server/src/server.js"
+  }
 }
