@@ -29,3 +29,14 @@ export function getProductImageUrl(product) {
   if (url) return url;
   return IMAGE_BY_CATEGORY.Figure || "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800";
 }
+
+/**
+ * Danh sách URL ảnh (đã resolve) — dùng gallery / hover thẻ sản phẩm.
+ * @param {{ images?: string[] } | null | undefined} product
+ * @returns {string[]}
+ */
+export function getProductGalleryUrls(product) {
+  if (!product) return [];
+  if (product.images?.length) return product.images.map((u) => resolvePublicUrl(u));
+  return [getProductImageUrl(product)];
+}

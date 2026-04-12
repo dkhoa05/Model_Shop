@@ -1,4 +1,7 @@
 import { Routes, Route, Link } from "react-router-dom";
+import CartDrawer from "./components/CartDrawer.jsx";
+import UserAvatar from "./components/UserAvatar.jsx";
+import { useCartDrawer } from "./context/CartDrawerContext.jsx";
 import HomePage from "./pages/HomePage.jsx";
 import ProductsPage from "./pages/ProductsPage.jsx";
 import ProductDetailPage from "./pages/ProductDetailPage.jsx";
@@ -19,6 +22,7 @@ import ProtectedRoute from "./components/ProtectedRoute.jsx";
 export default function App() {
   const { user, logout } = useAuth();
   const { theme } = useTheme();
+  const { openCart, cartButtonRef } = useCartDrawer();
 
   return (
     <div
@@ -31,7 +35,7 @@ export default function App() {
     >
       <header
         className={
-          "border-b transition-colors w-full " +
+          "sticky top-0 z-40 border-b transition-colors w-full " +
           (theme === "dark"
             ? "border-slate-800 bg-slate-900/95 backdrop-blur"
             : "border-rose-200 bg-rose-600 shadow-md")
@@ -60,12 +64,17 @@ export default function App() {
             >
               Sản phẩm
             </Link>
-            <Link
-              to="/cart"
-              className={theme === "dark" ? "hover:text-cyan-300 text-slate-300" : "text-white/95 hover:text-white"}
+            <button
+              ref={cartButtonRef}
+              type="button"
+              onClick={openCart}
+              className={
+                (theme === "dark" ? "hover:text-cyan-300 text-slate-300" : "text-white/95 hover:text-white") +
+                " bg-transparent border-0 cursor-pointer text-sm p-0 font-inherit"
+              }
             >
               Giỏ hàng
-            </Link>
+            </button>
             {user && (
               <>
                 <Link
@@ -113,6 +122,13 @@ export default function App() {
             {/* Theme toggle removed: UI locked to a single professional theme */}
             {user ? (
               <>
+                <Link
+                  to="/profile"
+                  className="flex items-center gap-2 shrink-0 rounded-full outline-none ring-offset-2 ring-offset-transparent focus-visible:ring-2 focus-visible:ring-white/70"
+                  title="Tài khoản"
+                >
+                  <UserAvatar src={user.avatarUrl} name={user.name} sizeClass="w-9 h-9" />
+                </Link>
                 <span className={"text-xs " + (theme === "dark" ? "text-slate-300" : "text-white/90")}>
                   Xin chào, <span className="font-medium text-white">{user.name}</span>
                 </span>
@@ -303,6 +319,8 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      <CartDrawer />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../services/api.js";
-import { getProductImageUrl } from "../utils/productImage.js";
+import ProductCardHoverImage from "../components/ProductCardHoverImage.jsx";
 
 export default function HomePage() {
   const { theme } = useTheme();
@@ -165,12 +165,11 @@ export default function HomePage() {
                   to={`/products/${p._id}`}
                   className="group rounded-2xl border border-slate-800 bg-slate-900/40 hover:border-cyan-500/40 transition overflow-hidden"
                 >
-                  <div className="aspect-[4/3] overflow-hidden bg-slate-900">
-                    <img
-                      src={getProductImageUrl(p)}
+                  <div className="relative aspect-[4/3] overflow-hidden bg-slate-900">
+                    <ProductCardHoverImage
+                      product={p}
                       alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      loading="lazy"
+                      className="absolute inset-0"
                     />
                   </div>
                   <div className="p-4 space-y-1">
@@ -209,12 +208,11 @@ export default function HomePage() {
                   to={`/products/${p._id}`}
                   className="group rounded-2xl border border-slate-800 bg-slate-900/40 hover:border-cyan-500/40 transition overflow-hidden"
                 >
-                  <div className="aspect-[4/3] overflow-hidden bg-slate-900">
-                    <img
-                      src={getProductImageUrl(p)}
+                  <div className="relative aspect-[4/3] overflow-hidden bg-slate-900">
+                    <ProductCardHoverImage
+                      product={p}
                       alt={p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      loading="lazy"
+                      className="absolute inset-0"
                     />
                   </div>
                   <div className="p-4 space-y-1">

@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../services/api.js";
 import { getProductImageUrl } from "../utils/productImage.js";
+import { resolvePublicUrl } from "../utils/publicUrl.js";
 import { useTheme } from "../context/ThemeContext.jsx";
+import { useCartDrawer } from "../context/CartDrawerContext.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import {
   AVAILABILITY_LABELS,
   getAvailabilityBadgeClass,
-  canAddModelToCart
+  canAddModelToCart,
+  getEffectiveAvailability,
+  isSoldOutByStock
 } from "../lib/productAvailability.js";
+import { getCartItemsSafe } from "../lib/cartStorage.js";
 
 export default function ProductDetailPage() {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const { openCart } = useCartDrawer();
   const { theme } = useTheme();
   const { token } = useAuth();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [ratingAvg, setRatingAvg] = useState(0);
@@ -26,6 +30,17 @@ export default function ProductDetailPage() {
   const [myComment, setMyComment] = useState("");
   const [reviewMsg, setReviewMsg] = useState("");
   const [qty, setQty] = useState(1);
+  const [activeImg, setActiveImg] = useState(0);
+
+  const galleryUrls = useMemo(() => {
+    if (!product) return [];
+    if (product.images?.length) return product.images.map((u) => resolvePublicUrl(u));
+    return [getProductImageUrl(product)];
+  }, [product]);
+
+  useEffect(() => {
+    setActiveImg(0);
+  }, [id, product?._id]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -78,14 +93,15 @@ export default function ProductDetailPage() {
     if (!product || !canAddModelToCart(product)) return;
     const add = Math.min(qty, product.stock != null ? product.stock : qty);
     if (add < 1) return;
-    const raw = localStorage.getItem("cart") || "[]";
-    const cart = JSON.parse(raw);
+    const cart = getCartItemsSafe();
     const pid = String(product._id ?? product.id ?? "");
     const existing = cart.find((i) => String(i.productId) === pid);
+    const thumb = galleryUrls[0] || getProductImageUrl(product);
     if (existing) {
       const nextQ = existing.quantity + add;
       existing.quantity =
         product.stock != null ? Math.min(nextQ, product.stock) : nextQ;
+      if (!existing.imageUrl) existing.imageUrl = thumb;
     } else {
       cart.push({
         productId: pid,
@@ -93,16 +109,12 @@ export default function ProductDetailPage() {
         price: product.price,
         quantity: add,
         variantLabel: product.variantLabel || "",
-        availability: product.availability || "in_stock"
+        availability: product.availability || "in_stock",
+        imageUrl: thumb
       });
     }
     localStorage.setItem("cart", JSON.stringify(cart));
-    setToast(`Đã thêm ${add} mô hình vào giỏ hàng.`);
-    window.clearTimeout(handleAddToCart._t);
-    handleAddToCart._t = window.setTimeout(() => {
-      setToast("");
-      navigate("/products");
-    }, 900);
+    openCart();
   };
 
   if (loading) return <p className="text-sm text-slate-500 dark:text-slate-300">Đang tải...</p>;
@@ -110,17 +122,13 @@ export default function ProductDetailPage() {
 
   const outOfStock = !canAddModelToCart(product);
   const canReview = Boolean(token);
-  const av = product.availability || "in_stock";
+  const av = getEffectiveAvailability(product);
+  const mainImgIdx = galleryUrls.length
+    ? Math.min(activeImg, galleryUrls.length - 1)
+    : 0;
 
   return (
     <div className="w-full">
-      {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-          <div className="px-4 py-2 rounded-xl text-sm font-semibold border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 shadow-lg">
-            {toast}
-          </div>
-        </div>
-      )}
       <div className="text-sm text-slate-500 dark:text-slate-400 mb-4">
         <Link to="/" className="hover:text-rose-600 dark:hover:text-cyan-400">Trang chủ</Link>
         <span className="mx-2">/</span>
@@ -129,17 +137,53 @@ export default function ProductDetailPage() {
         <span className="text-slate-700 dark:text-slate-200 line-clamp-1">{product.name}</span>
       </div>
       <div className="grid md:grid-cols-2 gap-8">
-      <div
-        className={
-          "rounded-2xl border h-64 md:h-80 overflow-hidden flex items-center justify-center " +
-          (theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-rose-200 shadow-sm")
-        }
-      >
-        <img
-          src={getProductImageUrl(product)}
-          alt={product.name}
-          className="max-w-full max-h-full w-full h-full object-contain"
-        />
+      <div className="space-y-3">
+        <div
+          className={
+            "rounded-2xl border h-64 md:h-80 overflow-hidden flex items-center justify-center " +
+            (theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-rose-200 shadow-sm")
+          }
+        >
+          <img
+            src={galleryUrls[mainImgIdx]}
+            alt={`${product.name} — ảnh ${mainImgIdx + 1}`}
+            className="max-w-full max-h-full w-full h-full object-contain"
+          />
+        </div>
+        {galleryUrls.length > 1 && (
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+              Ảnh minh họa ({galleryUrls.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {galleryUrls.map((url, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveImg(i)}
+                  className={
+                    "rounded-xl overflow-hidden border-2 transition shrink-0 " +
+                    (mainImgIdx === i
+                      ? theme === "dark"
+                        ? "border-cyan-400 ring-2 ring-cyan-500/30"
+                        : "border-rose-500 ring-2 ring-rose-300/50"
+                      : theme === "dark"
+                        ? "border-slate-700 hover:border-slate-500"
+                        : "border-rose-200 hover:border-rose-400")
+                  }
+                  aria-label={`Xem ảnh ${i + 1}`}
+                >
+                  <img
+                    src={url}
+                    alt=""
+                    className="w-16 h-16 sm:w-20 sm:h-20 object-cover"
+                    loading="lazy"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="space-y-3">
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{product.name}</h2>
@@ -174,7 +218,7 @@ export default function ProductDetailPage() {
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Tồn kho (có thể đặt):{" "}
             <span className={outOfStock ? "text-red-600 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-medium"}>
-              {outOfStock ? "Không đặt thêm" : `${product.stock} mô hình`}
+              {isSoldOutByStock(product) ? "Hết hàng" : outOfStock ? "Không đặt thêm" : `${product.stock} mô hình`}
             </span>
           </p>
         )}
@@ -228,7 +272,11 @@ export default function ProductDetailPage() {
                 : "bg-rose-500 text-white hover:bg-rose-600")
           }
         >
-          {outOfStock ? "Không thể thêm" : "Thêm vào giỏ hàng"}
+          {outOfStock
+            ? isSoldOutByStock(product)
+              ? "Hết hàng"
+              : "Không thể thêm"
+            : "Thêm vào giỏ hàng"}
         </button>
       </div>
     </div>

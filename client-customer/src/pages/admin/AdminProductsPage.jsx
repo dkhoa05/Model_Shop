@@ -1,8 +1,137 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { api } from "../../services/api.js";
 import { getProductImageUrl } from "../../utils/productImage.js";
+
+function AdminSuggestCombo({
+  id,
+  label,
+  value,
+  onValueChange,
+  placeholder,
+  required,
+  suggestions,
+  inputClass,
+  theme
+}) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  const filtered = useMemo(() => {
+    const q = String(value || "").trim().toLowerCase();
+    const list = suggestions || [];
+    if (!q) return list;
+    return list.filter((s) => String(s).toLowerCase().includes(q));
+  }, [suggestions, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  const listClass =
+    theme === "dark"
+      ? "absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-slate-600 bg-slate-800 py-1 shadow-xl"
+      : "absolute z-50 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-rose-200 bg-white py-1 shadow-lg";
+
+  const itemClass = (picked) => {
+    if (theme === "dark") {
+      return (
+        "px-3 py-2.5 text-sm cursor-pointer transition-colors " +
+        (picked
+          ? "bg-blue-600 text-white font-medium"
+          : "text-slate-100 hover:bg-blue-600 hover:text-white")
+      );
+    }
+    return (
+      "px-3 py-2.5 text-sm cursor-pointer transition-colors " +
+      (picked
+        ? "bg-rose-600 text-white font-medium"
+        : "text-slate-800 hover:bg-rose-100")
+    );
+  };
+
+  return (
+    <div className="space-y-1" ref={wrapRef}>
+      <label htmlFor={id} className="text-xs text-slate-500 dark:text-slate-400">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          autoComplete="off"
+          value={value}
+          required={required}
+          placeholder={placeholder}
+          className={inputClass + " pr-10"}
+          onChange={(e) => {
+            onValueChange(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          className={
+            "absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 outline-none focus-visible:ring-2 " +
+            (theme === "dark"
+              ? "text-slate-200 hover:text-white focus-visible:ring-cyan-400"
+              : "text-slate-600 hover:text-rose-700 focus-visible:ring-rose-400")
+          }
+          onClick={() => setOpen((o) => !o)}
+          aria-label="Mở danh sách gợi ý"
+        >
+          <svg
+            className="h-4 w-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        {open && filtered.length > 0 ? (
+          <ul className={listClass} role="listbox">
+            {filtered.map((opt) => (
+              <li
+                key={opt}
+                role="option"
+                aria-selected={opt === value}
+                className={itemClass(opt === value)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onValueChange(opt);
+                  setOpen(false);
+                }}
+              >
+                {opt}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminProductsPage() {
   const { user } = useAuth();
@@ -36,6 +165,24 @@ export default function AdminProductsPage() {
   useEffect(() => {
     fetchProducts();
   }, []);
+
+  const categorySuggestions = useMemo(() => {
+    const set = new Set();
+    for (const p of products) {
+      const c = String(p.category || "").trim();
+      if (c) set.add(c);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [products]);
+
+  const brandSuggestions = useMemo(() => {
+    const set = new Set();
+    for (const p of products) {
+      const b = String(p.brand || "").trim();
+      if (b) set.add(b);
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "vi"));
+  }, [products]);
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -161,20 +308,27 @@ export default function AdminProductsPage() {
           placeholder="Tồn kho (số lượng)"
           className={inputClass}
         />
-        <input
-          name="category"
+        <AdminSuggestCombo
+          id="cust-admin-product-category"
+          label="Loại (danh mục) — chọn gợi ý hoặc gõ mới"
           value={form.category}
-          onChange={handleChange}
-          placeholder="Loại (Anime, Figure, Gundam...)"
-          className={inputClass}
+          onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+          placeholder="Anime, Figure, Gundam..."
           required
+          suggestions={categorySuggestions}
+          inputClass={inputClass}
+          theme={theme}
         />
-        <input
-          name="brand"
+        <AdminSuggestCombo
+          id="cust-admin-product-brand"
+          label="Hãng — chọn gợi ý hoặc gõ mới"
           value={form.brand}
-          onChange={handleChange}
-          placeholder="Hãng (Bandai, Good Smile...)"
-          className={inputClass}
+          onValueChange={(v) => setForm((f) => ({ ...f, brand: v }))}
+          placeholder="Bandai, Good Smile..."
+          required={false}
+          suggestions={brandSuggestions}
+          inputClass={inputClass}
+          theme={theme}
         />
         <textarea
           name="description"

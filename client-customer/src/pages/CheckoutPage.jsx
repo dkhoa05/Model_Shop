@@ -3,18 +3,15 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { api } from "../services/api.js";
-import {
-  SHIPPING_FLAT_FEE,
-  FREE_SHIPPING_THRESHOLD,
-  COUPON_HINTS,
-  previewCouponDiscount
-} from "../lib/checkoutConstants.js";
+import { SHIPPING_FLAT_FEE, FREE_SHIPPING_THRESHOLD } from "../lib/checkoutConstants.js";
 import {
   PROVINCES,
   DISTRICTS_BY_PROVINCE,
   WARDS_BY_DISTRICT
 } from "../data/vnAddressHierarchy.js";
 import { normalizeCartProductId } from "../lib/cartProductId.js";
+import { getCartItemsSafe } from "../lib/cartStorage.js";
+import { useCartDrawer } from "../context/CartDrawerContext.jsx";
 
 const STEPS = [
   { id: 1, label: "Thông tin nhận mô hình" },
@@ -25,7 +22,10 @@ const STEPS = [
 
 export default function CheckoutPage() {
   const { token, user } = useAuth();
+  const canUseCoupons = Boolean(token);
+  const hasAccountEmail = Boolean(token && user?.email?.trim());
   const { theme } = useTheme();
+  const { notifyCartChanged } = useCartDrawer();
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [step, setStep] = useState(1);
@@ -38,14 +38,35 @@ export default function CheckoutPage() {
   const [addressDetail, setAddressDetail] = useState("");
   const [deliveryType, setDeliveryType] = useState("delivery");
   const [couponCode, setCouponCode] = useState("");
+  const [discountPreview, setDiscountPreview] = useState(0);
+  const [couponPreviewError, setCouponPreviewError] = useState("");
+  const [couponHints, setCouponHints] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const raw = localStorage.getItem("cart") || "[]";
-    setItems(JSON.parse(raw));
+    setItems(getCartItemsSafe());
   }, []);
+
+  useEffect(() => {
+    if (!canUseCoupons) {
+      setCouponCode("");
+      setDiscountPreview(0);
+      setCouponPreviewError("");
+    }
+  }, [canUseCoupons]);
+
+  useEffect(() => {
+    if (!canUseCoupons) {
+      setCouponHints([]);
+      return;
+    }
+    api
+      .get("/coupons/hints")
+      .then((res) => setCouponHints(res.data?.hints || []))
+      .catch(() => setCouponHints([]));
+  }, [canUseCoupons]);
 
   useEffect(() => {
     if (user?.name) setRecipientName(user.name);
@@ -74,10 +95,44 @@ export default function CheckoutPage() {
     [items]
   );
 
-  const discountPreview = useMemo(
-    () => previewCouponDiscount(couponCode, subtotal),
-    [couponCode, subtotal]
-  );
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const raw = couponCode.trim();
+      if (!raw) {
+        setDiscountPreview(0);
+        setCouponPreviewError("");
+        return;
+      }
+      if (!canUseCoupons) {
+        setDiscountPreview(0);
+        setCouponPreviewError("Đăng nhập để sử dụng mã giảm giá.");
+        return;
+      }
+      const lines = items.map((i) => ({
+        product: normalizeCartProductId(i),
+        quantity: i.quantity,
+        price: i.price
+      }));
+      api
+        .post("/coupons/preview", { code: raw, lines })
+        .then((res) => {
+          setDiscountPreview(Number(res.data?.discount) || 0);
+          setCouponPreviewError(res.data?.error || "");
+        })
+        .catch((err) => {
+          setDiscountPreview(0);
+          const s = err.response?.status;
+          if (s === 401) {
+            setCouponPreviewError("Phiên đăng nhập hết hạn hoặc chưa đăng nhập.");
+          } else if (s === 403) {
+            setCouponPreviewError("Tài khoản không thể sử dụng mã giảm giá.");
+          } else {
+            setCouponPreviewError("");
+          }
+        });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [couponCode, subtotal, items, canUseCoupons]);
 
   const shippingFee = useMemo(() => {
     if (deliveryType === "pickup") return 0;
@@ -123,7 +178,7 @@ export default function CheckoutPage() {
   }
 
   const emailOk =
-    !guestEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
+    hasAccountEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim());
   const canNextFrom1 =
     recipientName.trim().length >= 2 && phone.trim().length >= 8 && emailOk;
 
@@ -160,6 +215,18 @@ export default function CheckoutPage() {
         );
         return;
       }
+      if (!hasAccountEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guestEmail.trim())) {
+        setMessage("Vui lòng nhập email hợp lệ ở bước 1 để nhận thông báo (thanh toán, giao hàng, hủy đơn).");
+        return;
+      }
+      if (couponCode.trim() && !canUseCoupons) {
+        setMessage("Vui lòng đăng nhập để sử dụng mã giảm giá.");
+        return;
+      }
+      if (couponCode.trim() && couponPreviewError) {
+        setMessage(couponPreviewError);
+        return;
+      }
       const body = {
         items: payloadItems,
         phone: phone.trim(),
@@ -176,6 +243,7 @@ export default function CheckoutPage() {
       };
       const res = await api.post(`/orders`, body);
       localStorage.removeItem("cart");
+      notifyCartChanged();
       setItems([]);
       sessionStorage.setItem("checkoutPhone", phone.trim());
       navigate(`/orders/${res.data._id}`, { replace: true, state: { orderPlaced: true } });
@@ -270,7 +338,9 @@ export default function CheckoutPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-sm text-slate-600 dark:text-slate-300">Email (tuỳ chọn — nhận cập nhật đơn)</label>
+                <label className="text-sm text-slate-600 dark:text-slate-300">
+                  Email{hasAccountEmail ? " (đã lấy từ tài khoản nếu để trống)" : " *"} — thông báo thanh toán, giao hàng, hủy đơn
+                </label>
                 <input
                   type="email"
                   value={guestEmail}
@@ -284,16 +354,37 @@ export default function CheckoutPage() {
                 <input
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value)}
-                  className={inputClass}
-                  placeholder="Nhập mã"
+                  disabled={!canUseCoupons}
+                  className={
+                    inputClass + (!canUseCoupons ? " opacity-60 cursor-not-allowed" : "")
+                  }
+                  placeholder={canUseCoupons ? "Nhập mã" : "Đăng nhập để dùng mã"}
                 />
-                <ul className="text-xs text-slate-500 dark:text-slate-500 space-y-0.5 mt-1">
-                  {COUPON_HINTS.map((h) => (
-                    <li key={h.code}>
-                      <span className="font-mono font-semibold">{h.code}</span> — {h.desc}
-                    </li>
-                  ))}
-                </ul>
+                {!canUseCoupons && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Chỉ tài khoản đã đăng nhập mới áp dụng được mã.{" "}
+                    <Link to="/login" className="underline font-medium text-rose-600 dark:text-cyan-400">
+                      Đăng nhập
+                    </Link>
+                  </p>
+                )}
+                {couponPreviewError && (
+                  <p className="text-xs text-amber-600 dark:text-amber-300 mt-1">{couponPreviewError}</p>
+                )}
+                {!couponPreviewError && couponCode.trim() && discountPreview > 0 && (
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                    Áp dụng: −{discountPreview.toLocaleString("vi-VN")} ₫
+                  </p>
+                )}
+                {canUseCoupons && couponHints.length > 0 && (
+                  <ul className="text-xs text-slate-500 dark:text-slate-500 space-y-0.5 mt-2">
+                    {couponHints.map((h) => (
+                      <li key={h.code}>
+                        <span className="font-mono font-semibold">{h.code}</span> — {h.desc}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <button
                 type="button"
@@ -358,15 +449,18 @@ export default function CheckoutPage() {
               {deliveryType === "delivery" && (
                 <div className="space-y-3 rounded-xl border border-slate-700/80 p-3 bg-slate-900/20">
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Chọn Tỉnh/Thành phố → Quận/Huyện → Phường/Xã, sau đó nhập số nhà, tên đường (đóng gói mô hình cẩn thận).
+                    Chọn <strong className="text-slate-600 dark:text-slate-300">Thành phố / Tỉnh</strong> →{" "}
+                    <strong className="text-slate-600 dark:text-slate-300">Quận / Huyện</strong> →{" "}
+                    <strong className="text-slate-600 dark:text-slate-300">Phường / Xã</strong>
+                    {" "}(danh sách quận và phường thay đổi theo cấp trên), sau đó nhập số nhà, tên đường.
                   </p>
                   <div className="grid sm:grid-cols-2 gap-2">
                     <div className="space-y-1 sm:col-span-2">
-                      <label className="text-xs text-slate-500">Tỉnh / Thành phố *</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400">Thành phố / Tỉnh *</label>
                       <select
                         value={province}
                         onChange={(e) => setProvince(e.target.value)}
-                        className={inputClass}
+                        className={inputClass + " text-slate-900 dark:text-slate-100"}
                       >
                         <option value="">— Chọn —</option>
                         {PROVINCES.map((p) => (
@@ -377,11 +471,11 @@ export default function CheckoutPage() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-slate-500">Quận / Huyện *</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400">Quận / Huyện *</label>
                       <select
                         value={district}
                         onChange={(e) => setDistrict(e.target.value)}
-                        className={inputClass}
+                        className={inputClass + " text-slate-900 dark:text-slate-100"}
                         disabled={!province}
                       >
                         <option value="">— Chọn —</option>
@@ -393,11 +487,11 @@ export default function CheckoutPage() {
                       </select>
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-slate-500">Phường / Xã *</label>
+                      <label className="text-xs text-slate-500 dark:text-slate-400">Phường / Xã *</label>
                       <select
                         value={ward}
                         onChange={(e) => setWard(e.target.value)}
-                        className={inputClass}
+                        className={inputClass + " text-slate-900 dark:text-slate-100"}
                         disabled={!district}
                       >
                         <option value="">— Chọn —</option>

@@ -270,7 +270,11 @@ export default function OrderDetailPage() {
             </p>
             {order.paymentMethod === "bank_transfer" && (
               <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
-                {paymentConfig && (paymentConfig.bankName || paymentConfig.bankAccount || paymentConfig.accountHolder) ? (
+                {paymentConfig &&
+                (paymentConfig.bankName ||
+                  paymentConfig.bankAccount ||
+                  paymentConfig.accountHolder ||
+                  paymentConfig.qrImageUrl) ? (
                   <>
                     {paymentConfig.bankName && (
                       <p><span className="font-medium text-slate-700 dark:text-slate-200">Ngân hàng:</span> {paymentConfig.bankName}</p>
@@ -282,13 +286,16 @@ export default function OrderDetailPage() {
                       <p><span className="font-medium text-slate-700 dark:text-slate-200">Chủ tài khoản:</span> {paymentConfig.accountHolder}</p>
                     )}
                     {paymentConfig.qrImageUrl && (
-                      <div className="mt-2">
-                        <p className="font-medium text-slate-700 dark:text-slate-200 mb-1">Quét mã QR chuyển khoản:</p>
-                        <img
-                          src={resolvePublicUrl(paymentConfig.qrImageUrl)}
-                          alt="QR chuyển khoản"
-                          className="w-40 h-40 object-contain rounded-xl border border-slate-600"
-                        />
+                      <div className="mt-3">
+                        <p className="font-medium text-slate-700 dark:text-slate-200 mb-2">Quét mã QR chuyển khoản</p>
+                        <div className="rounded-xl border border-slate-600 bg-slate-900/30 p-2 inline-block max-w-full">
+                          <img
+                            src={resolvePublicUrl(paymentConfig.qrImageUrl)}
+                            alt="QR chuyển khoản"
+                            className="max-w-[min(280px,100%)] w-auto max-h-72 h-auto object-contain mx-auto block"
+                            loading="lazy"
+                          />
+                        </div>
                       </div>
                     )}
                   </>

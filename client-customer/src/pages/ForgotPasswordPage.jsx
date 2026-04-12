@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
             Quên mật khẩu
           </h1>
           <p className={theme === "dark" ? "text-slate-400" : "text-slate-600"}>
-            Nhập email đăng ký, chúng tôi sẽ gửi link đặt lại mật khẩu. (Demo: link hiển thị ngay bên dưới.)
+            Nhập email đã đăng ký — chúng tôi sẽ gửi link đặt lại mật khẩu tới hộp thư của bạn.
           </p>
         </div>
 
@@ -81,10 +81,11 @@ export default function ForgotPasswordPage() {
             <div className="space-y-3 p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
               <p className="text-sm text-slate-700 dark:text-slate-300">{done.message}</p>
               {done.resetLink && (
-                <p className="text-xs break-all">
+                <p className="text-xs text-amber-700 dark:text-amber-200/90 rounded-lg bg-amber-50 dark:bg-amber-950/40 p-2 border border-amber-200/80 dark:border-amber-800">
+                  <span className="font-medium">Chỉ môi trường dev (chưa cấu hình SMTP):</span>
                   <a
                     href={done.resetLink}
-                    className={theme === "dark" ? "text-cyan-400 hover:underline" : "text-rose-600 hover:underline"}
+                    className="block mt-1 break-all text-rose-600 dark:text-cyan-400 hover:underline"
                   >
                     {done.resetLink}
                   </a>

@@ -6,6 +6,17 @@ export const AVAILABILITY_LABELS = {
   sold_out: "Hết hàng"
 };
 
+/** Tồn kho = 0 (hoặc âm) → luôn coi là hết hàng khi hiển thị badge/nhãn */
+export function isSoldOutByStock(product) {
+  return Boolean(product && product.stock !== undefined && Number(product.stock) <= 0);
+}
+
+/** availability từ DB + quy tắc tồn kho — dùng cho badge trên card & trang chi tiết */
+export function getEffectiveAvailability(product) {
+  if (isSoldOutByStock(product)) return "sold_out";
+  return product?.availability || "in_stock";
+}
+
 export function getAvailabilityBadgeClass(availability, theme) {
   const a = availability || "in_stock";
   if (a === "sold_out") return theme === "dark" ? "bg-slate-700 text-slate-300" : "bg-slate-200 text-slate-700";

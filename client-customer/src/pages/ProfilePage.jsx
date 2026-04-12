@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
-import { api, API_BASE } from "../services/api.js";
+import { api } from "../services/api.js";
+import UserAvatar from "../components/UserAvatar.jsx";
 
 export default function ProfilePage() {
   const { user, token, login, logout } = useAuth();
@@ -29,8 +30,17 @@ export default function ProfilePage() {
     setDefaultPaymentMethod(user?.defaultPaymentMethod || "cod");
   }, [user]);
 
-  const absUrl = (url) =>
-    !url ? "" : url.startsWith("http") ? url : `${API_BASE.replace(/\/api$/, "")}${url}`;
+  /** Xem trước ảnh vừa chọn (chưa lưu) */
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  useEffect(() => {
+    if (!avatarFile) {
+      setAvatarPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(avatarFile);
+    setAvatarPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [avatarFile]);
 
   const inputClass =
     theme === "dark"
@@ -132,25 +142,57 @@ export default function ProfilePage() {
       <div className={cardClass}>
         <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 mb-3">Thông tin cá nhân</p>
         <form onSubmit={saveProfile} className="space-y-3">
-          <div className="flex items-center gap-3">
-            <div className="w-14 h-14 rounded-2xl overflow-hidden border border-slate-800 bg-slate-900/40 shrink-0">
-              {absUrl(avatarUrl) ? (
-                <img src={absUrl(avatarUrl)} alt="avatar" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">
-                  AVT
-                </div>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-5">
+            <UserAvatar
+              src={avatarPreview || avatarUrl || ""}
+              name={name || user?.name}
+              sizeClass="w-28 h-28"
+            />
+            <div className="flex-1 space-y-2 min-w-0">
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300">Ảnh đại diện</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-500">
+                JPG, PNG hoặc WebP • tối đa 5MB. Ảnh hiển thị tròn trên tài khoản và menu.
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label
+                  className={
+                    "inline-flex cursor-pointer items-center rounded-xl px-4 py-2 text-sm font-semibold transition " +
+                    (theme === "dark"
+                      ? "bg-slate-800 text-cyan-300 hover:bg-slate-700 border border-slate-600"
+                      : "bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200")
+                  }
+                >
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
+                  />
+                  {avatarUrl || avatarFile ? "Đổi ảnh" : "Chọn ảnh"}
+                </label>
+                {(avatarUrl || avatarFile) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarFile(null);
+                      setAvatarUrl("");
+                    }}
+                    className={
+                      "rounded-xl px-3 py-2 text-sm font-medium transition " +
+                      (theme === "dark"
+                        ? "text-slate-400 hover:text-red-400 hover:bg-slate-800"
+                        : "text-slate-600 hover:text-red-600 hover:bg-rose-50")
+                    }
+                  >
+                    Gỡ ảnh
+                  </button>
+                )}
+              </div>
+              {avatarFile && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  Đã chọn ảnh mới — nhấn &quot;Lưu thay đổi&quot; để tải lên.
+                </p>
               )}
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-slate-500 dark:text-slate-400">Ảnh đại diện</label>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={(e) => setAvatarFile(e.target.files?.[0] || null)}
-                className="w-full text-xs text-slate-500 dark:text-slate-400 mt-1"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">png/jpg/webp • tối đa 5MB</p>
             </div>
           </div>
           <div>
