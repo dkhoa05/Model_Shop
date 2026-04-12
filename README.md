@@ -7,7 +7,7 @@
 - NodeJS 18+ (khuyến nghị)
 - MongoDB (dùng MongoDB Compass cũng được)
 
-## Demo nhanh (thuyết trình)
+## Demo nhanh 
 
 - **Customer**: `http://localhost:5173`
 - **Admin**: `http://localhost:5174`
@@ -44,6 +44,26 @@ cd server
 npm install
 npm run dev
 ```
+
+### Cấu hình SMTP (gửi email quên mật khẩu)
+
+Trong `server/.env`, thêm (hoặc chỉnh) các biến sau để **gửi email thật** khi khách dùng **Quên mật khẩu**:
+
+| Biến | Ý nghĩa |
+|------|--------|
+| `FRONTEND_URL` | URL app khách (vd. `http://localhost:5173`) — link trong email trỏ tới `{FRONTEND_URL}/reset-password?token=...` |
+| `SMTP_HOST` | Máy chủ SMTP (Gmail: `smtp.gmail.com`) |
+| `SMTP_PORT` | Thường `587` (TLS) hoặc `465` (SSL) |
+| `SMTP_SECURE` | `false` với port 587; `true` với port 465 |
+| `SMTP_USER` | Tài khoản đăng nhập SMTP (vd. email Gmail đầy đủ) |
+| `SMTP_PASS` | Mật khẩu SMTP — với **Gmail** phải dùng **Mật khẩu ứng dụng** (App Password), không dùng mật khẩu đăng nhập web |
+| `MAIL_FROM` | Tên hiển thị người gửi (vd. `"Model Shop <you@gmail.com>"`) |
+
+**Gmail:** bật xác minh 2 bước → [Mật khẩu ứng dụng](https://myaccount.google.com/apppasswords) → tạo mật khẩu 16 ký tự cho “Thư”, điền vào `SMTP_PASS`.
+
+Nếu **chưa cấu hình SMTP**, môi trường **development** vẫn hiển thị link đặt lại mật khẩu trên màn hình; **production** cần SMTP đầy đủ hoặc sẽ báo lỗi gửi mail.
+
+Chi tiết đầy đủ nằm trong comment của `server/.env.example`.
 
 Seed dữ liệu mẫu (tạo admin + user + sản phẩm + đơn + khoản chi demo):
 
