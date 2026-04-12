@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../services/api.js";
 import { getProductImageUrl } from "../utils/productImage.js";
+import { resolvePublicUrl } from "../utils/publicUrl.js";
 import { useTheme } from "../context/ThemeContext.jsx";
 
 export default function ProductDetailPage() {
@@ -10,6 +11,17 @@ export default function ProductDetailPage() {
   const { theme } = useTheme();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeImg, setActiveImg] = useState(0);
+
+  const galleryUrls = useMemo(() => {
+    if (!product) return [];
+    if (product.images?.length) return product.images.map((u) => resolvePublicUrl(u));
+    return [getProductImageUrl(product)];
+  }, [product]);
+
+  useEffect(() => {
+    setActiveImg(0);
+  }, [id, product?._id]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -48,6 +60,9 @@ export default function ProductDetailPage() {
   if (!product) return <p className="text-sm text-red-500">Không tìm thấy sản phẩm.</p>;
 
   const outOfStock = product.stock !== undefined && product.stock <= 0;
+  const mainImgIdx = galleryUrls.length
+    ? Math.min(activeImg, galleryUrls.length - 1)
+    : 0;
 
   return (
     <div className="w-full">
@@ -59,17 +74,48 @@ export default function ProductDetailPage() {
         <span className="text-slate-700 dark:text-slate-200 line-clamp-1">{product.name}</span>
       </div>
       <div className="grid md:grid-cols-2 gap-8">
-      <div
-        className={
-          "rounded-2xl border h-64 md:h-80 overflow-hidden " +
-          (theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-rose-200 shadow-sm")
-        }
-      >
-        <img
-          src={getProductImageUrl(product)}
-          alt={product.name}
-          className="w-full h-full object-cover"
-        />
+      <div className="space-y-3">
+        <div
+          className={
+            "rounded-2xl border h-64 md:h-80 overflow-hidden flex items-center justify-center " +
+            (theme === "dark" ? "bg-slate-900 border-slate-800" : "bg-white border-rose-200 shadow-sm")
+          }
+        >
+          <img
+            src={galleryUrls[mainImgIdx]}
+            alt={`${product.name} — ảnh ${mainImgIdx + 1}`}
+            className="max-w-full max-h-full w-full h-full object-contain"
+          />
+        </div>
+        {galleryUrls.length > 1 && (
+          <div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+              Ảnh minh họa ({galleryUrls.length})
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {galleryUrls.map((url, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setActiveImg(i)}
+                  className={
+                    "rounded-xl overflow-hidden border-2 transition shrink-0 " +
+                    (mainImgIdx === i
+                      ? theme === "dark"
+                        ? "border-cyan-400 ring-2 ring-cyan-500/30"
+                        : "border-rose-500 ring-2 ring-rose-300/50"
+                      : theme === "dark"
+                        ? "border-slate-700 hover:border-slate-500"
+                        : "border-rose-200 hover:border-rose-400")
+                  }
+                  aria-label={`Xem ảnh ${i + 1}`}
+                >
+                  <img src={url} alt="" className="w-16 h-16 sm:w-20 sm:h-20 object-cover" loading="lazy" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       <div className="space-y-3">
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{product.name}</h2>

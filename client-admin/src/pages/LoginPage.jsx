@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useTheme } from "../context/ThemeContext.jsx";
 import { api } from "../services/api.js";
@@ -7,13 +7,13 @@ import { api } from "../services/api.js";
 function EyeIcon({ show }) {
   if (show)
     return (
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
       </svg>
     );
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878a4.5 4.5 0 106.262 6.262M4 4l3 3m14 0l3 3" />
     </svg>
   );
@@ -25,12 +25,40 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, login } = useAuth();
   const { theme } = useTheme();
 
   useEffect(() => {
-    if (user) navigate("/", { replace: true });
-  }, [user, navigate]);
+    // Cập nhật title & meta description cho trang login
+    document.title = "Đăng nhập | Model Shop - Mô hình & Figure chính hãng";
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) {
+      meta.setAttribute("content", "Đăng nhập vào Model Shop để mua sắm Gundam, Figure, Lego chính hãng với giá tốt nhất.");
+    }
+    // Thêm canonical
+    let canonical = document.querySelector('link[rel="canonical"]');
+    if (!canonical) {
+      canonical = document.createElement("link");
+      canonical.rel = "canonical";
+      document.head.appendChild(canonical);
+    }
+    canonical.href = `${window.location.origin}/login`;
+
+    return () => {
+      document.title = "Model Shop - Mô hình & Figure chính hãng";
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    const from = location.state?.from?.pathname;
+    if (from && typeof from === "string" && from !== "/login") {
+      navigate(from, { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
+  }, [user, navigate, location.state]);
 
   const inputClass =
     theme === "dark"
@@ -43,15 +71,21 @@ export default function LoginPage() {
     try {
       const res = await api.post(`/auth/login`, { identifier, password });
       login(res.data.token, res.data.user);
-      navigate("/");
+      const from = location.state?.from?.pathname;
+      if (from && typeof from === "string" && from !== "/login") {
+        navigate(from, { replace: true });
+      } else {
+        navigate("/", { replace: true });
+      }
     } catch (err) {
       setError("Tên đăng nhập/email hoặc mật khẩu không đúng.");
     }
   };
 
   return (
-    <div className="w-full min-h-[calc(100vh-12rem)] flex items-center">
+    <main className="w-full min-h-[calc(100vh-12rem)] flex items-center">
       <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+
         {/* Cột trái: nội dung trang trí */}
         <div
           className={
@@ -60,47 +94,58 @@ export default function LoginPage() {
               ? "bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700"
               : "bg-gradient-to-br from-rose-100 to-rose-200 border border-rose-200")
           }
+          aria-hidden="true"
         >
           <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-slate-100 mb-2">
-            Model Shop
+            Model Shop Admin
           </h1>
           <p className={theme === "dark" ? "text-slate-400" : "text-slate-600"}>
-            Mô hình & Figure chính hãng. Đăng nhập để xem sản phẩm và đặt hàng.
+          Trang quản trị dành cho quản lý sản phẩm, đơn hàng và người dùng.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-700 dark:bg-cyan-500/20 dark:text-cyan-300">
-              Gundam
-            </span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-700 dark:bg-cyan-500/20 dark:text-cyan-300">
-              Figure
-            </span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-700 dark:bg-cyan-500/20 dark:text-cyan-300">
-              Lego
-            </span>
-          </div>
+          <ul className="mt-6 flex flex-wrap gap-2 list-none" aria-label="Danh mục sản phẩm">
+            {["Gundam", "Figure", "Lego"].map((tag) => (
+              <li
+                key={tag}
+                className="px-3 py-1 rounded-full text-xs font-medium bg-rose-500/20 text-rose-700 dark:bg-cyan-500/20 dark:text-cyan-300"
+              >
+                {tag}
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Cột phải: form */}
-        <div className="max-w-sm mx-auto md:mx-0 w-full space-y-4">
-          <h2 className="text-xl font-semibold text-center text-slate-900 dark:text-slate-100">
+        {/* Cột phải: form đăng nhập */}
+        <section className="max-w-sm mx-auto md:mx-0 w-full space-y-4" aria-labelledby="login-heading">
+          <h2
+            id="login-heading"
+            className="text-xl font-semibold text-center text-slate-900 dark:text-slate-100"
+          >
             Đăng nhập
           </h2>
-          <form onSubmit={handleSubmit} className="space-y-3">
+
+          <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+            <label className="sr-only" htmlFor="identifier">Tên đăng nhập hoặc Email</label>
             <input
+              id="identifier"
               type="text"
               placeholder="Tên đăng nhập hoặc Email"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className={inputClass}
+              autoComplete="username"
               required
             />
+
             <div className="relative">
+              <label className="sr-only" htmlFor="password">Mật khẩu</label>
               <input
+                id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="Mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className={inputClass + " pr-10"}
+                autoComplete="current-password"
                 required
               />
               <button
@@ -110,14 +155,15 @@ export default function LoginPage() {
                   "absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded " +
                   (theme === "dark" ? "text-slate-400 hover:text-cyan-400" : "text-slate-500 hover:text-rose-500")
                 }
-                title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                aria-pressed={showPassword}
               >
                 <EyeIcon show={!showPassword} />
               </button>
             </div>
+
             {error && (
-              <p className="text-xs text-red-500 flex items-center gap-1 flex-wrap">
+              <p role="alert" className="text-xs text-red-500 flex items-center gap-1 flex-wrap">
                 {error}
                 <Link
                   to="/forgot-password"
@@ -127,6 +173,7 @@ export default function LoginPage() {
                 </Link>
               </p>
             )}
+
             <div className="flex justify-end">
               <Link
                 to="/forgot-password"
@@ -138,6 +185,7 @@ export default function LoginPage() {
                 Quên mật khẩu?
               </Link>
             </div>
+
             <button
               type="submit"
               className={
@@ -150,17 +198,18 @@ export default function LoginPage() {
               Đăng nhập
             </button>
           </form>
+
           <p className="text-xs text-center text-slate-500 dark:text-slate-400">
             Chưa có tài khoản?{" "}
             <Link
               to="/register"
               className={theme === "dark" ? "text-cyan-300 hover:text-cyan-200" : "text-rose-600 hover:text-rose-700"}
             >
-              Đăng ký
+              Đăng ký ngay
             </Link>
           </p>
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

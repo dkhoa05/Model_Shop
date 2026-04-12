@@ -82,11 +82,16 @@ export default function AdminReportsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, status]);
 
-  const labels = useMemo(() => data?.series?.map((x) => x.label) || [], [data]);
-  const revenueSeries = useMemo(() => data?.series?.map((x) => x.revenue) || [], [data]);
-  const ordersSeries = useMemo(() => data?.series?.map((x) => x.orders) || [], [data]);
-  const expenseSeries = useMemo(() => profitData?.series?.map((x) => x.expense) || [], [profitData]);
-  const profitSeries = useMemo(() => profitData?.series?.map((x) => x.profit) || [], [profitData]);
+  /** Một nguồn cho biểu đồ thu–chi–LN: tránh lệch chỉ số giữa API revenue và profit */
+  const comboSeries = useMemo(() => profitData?.series || [], [profitData]);
+  const labels = useMemo(() => comboSeries.map((x) => x.label), [comboSeries]);
+  const revenueSeries = useMemo(() => comboSeries.map((x) => Number(x.revenue) || 0), [comboSeries]);
+  const expenseSeries = useMemo(() => comboSeries.map((x) => Number(x.expense) || 0), [comboSeries]);
+  const profitSeries = useMemo(
+    () => revenueSeries.map((rev, i) => rev - (expenseSeries[i] || 0)),
+    [revenueSeries, expenseSeries]
+  );
+  const ordersSeries = useMemo(() => comboSeries.map((x) => Number(x.orders) || 0), [comboSeries]);
 
   const chartText = theme === "dark" ? "#e2e8f0" : "#0f172a";
   const grid = theme === "dark" ? "rgba(148,163,184,0.15)" : "rgba(15,23,42,0.08)";
@@ -181,21 +186,21 @@ export default function AdminReportsPage() {
           <div className={cardClass + " lg:col-span-1"}>
             <p className="text-xs text-slate-500 dark:text-slate-400">Tổng thu (doanh thu)</p>
             <p className="text-2xl font-semibold text-rose-600 dark:text-cyan-400 mt-1">
-              {(data?.totals?.revenue || 0).toLocaleString("vi-VN")} ₫
+              {(profitData?.totals?.revenue ?? data?.totals?.revenue ?? 0).toLocaleString("vi-VN")} ₫
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">Tổng chi</p>
-            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100 mt-1">
-              {(profitData?.totals?.expense || 0).toLocaleString("vi-VN")} ₫
+            <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mt-1">
+              {(profitData?.totals?.expense ?? 0).toLocaleString("vi-VN")} ₫
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">Lợi nhuận (Thu − Chi)</p>
             <p className={"text-lg font-semibold mt-1 " + ((profitData?.totals?.profit || 0) >= 0 ? "text-emerald-400" : "text-red-300")}>
               {(profitData?.totals?.profit || 0).toLocaleString("vi-VN")} ₫
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-              Tổng số đơn: <span className="font-semibold text-slate-700 dark:text-slate-200">{data?.totals?.orders || 0}</span>
-            </p>
-            <p className="text-xs text-slate-500 dark:text-slate-500 mt-2">
-              Mẹo: chọn “Tất cả” để xem tổng giá trị đơn theo kỳ (kể cả chưa giao).
+              Tổng số đơn:{" "}
+              <span className="font-semibold text-slate-700 dark:text-slate-200">
+                {profitData?.totals?.orders ?? data?.totals?.orders ?? 0}
+              </span>
             </p>
           </div>
 

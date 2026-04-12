@@ -6,6 +6,7 @@ import AdminUsersPage from "./pages/admin/AdminUsersPage.jsx";
 import AdminPaymentConfigPage from "./pages/admin/AdminPaymentConfigPage.jsx";
 import AdminReportsPage from "./pages/admin/AdminReportsPage.jsx";
 import AdminExpensesPage from "./pages/admin/AdminExpensesPage.jsx";
+import AdminCouponsPage from "./pages/admin/AdminCouponsPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import NotFoundPage from "./pages/NotFoundPage.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
@@ -133,6 +134,12 @@ export default function App() {
                   Cấu hình thanh toán
                 </Link>
                 <Link
+                  to="/admin/coupons"
+                  className={theme === "dark" ? "block px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-200" : "block px-3 py-2 rounded-xl hover:bg-rose-50 text-slate-700"}
+                >
+                  Mã giảm giá
+                </Link>
+                <Link
                   to="/admin/reports"
                   className={theme === "dark" ? "block px-3 py-2 rounded-xl hover:bg-slate-800 text-slate-200" : "block px-3 py-2 rounded-xl hover:bg-rose-50 text-slate-700"}
                 >
@@ -200,6 +207,7 @@ export default function App() {
                   }
                 />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/admin" element={<Navigate to="/admin/products" replace />} />
             <Route
               path="/admin/products"
               element={
@@ -229,6 +237,14 @@ export default function App() {
                   element={
                     <ProtectedRoute requireAdmin>
                       <AdminPaymentConfigPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/coupons"
+                  element={
+                    <ProtectedRoute requireAdmin>
+                      <AdminCouponsPage />
                     </ProtectedRoute>
                   }
                 />
