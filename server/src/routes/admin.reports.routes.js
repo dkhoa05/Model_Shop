@@ -2,13 +2,19 @@ import express from "express";
 import { auth, isAdmin } from "../middlewares/auth.js";
 import { Order } from "../models/Order.js";
 import { Expense } from "../models/Expense.js";
+import { parseOptionalDayBounds, snapReportRangeToVnCalendar } from "../utils/dateRangeQuery.js";
 
 const router = express.Router();
 
-function toDateOrNull(v) {
-  if (!v) return null;
-  const d = new Date(String(v));
-  return Number.isNaN(d.getTime()) ? null : d;
+const REPORT_TZ = process.env.REPORT_TZ || "Asia/Ho_Chi_Minh";
+
+/** Cùng khoảng ngày (VN) cho đơn hàng, chi phí và API danh sách khoản chi */
+function resolveReportBounds(queryFrom, queryTo, period) {
+  const def = getDefaultRange(period);
+  const q = parseOptionalDayBounds(queryFrom, queryTo);
+  const rawFrom = q.from ?? def.from;
+  const rawTo = q.to ?? def.to;
+  return snapReportRangeToVnCalendar(rawFrom, rawTo, REPORT_TZ);
 }
 
 function getDefaultRange(period) {
@@ -60,6 +66,25 @@ function buildSortStage(period) {
   return { _id: 1 };
 }
 
+/** Sắp xếp nhãn kỳ báo cáo theo thời gian (tránh localeCompare sai tuần W9 > W10) */
+function compareReportLabels(period, a, b) {
+  const la = String(a?.label ?? "");
+  const lb = String(b?.label ?? "");
+  if (period === "week") {
+    const pa = la.match(/^(\d+)-W(\d+)/);
+    const pb = lb.match(/^(\d+)-W(\d+)/);
+    if (pa && pb) {
+      const ya = parseInt(pa[1], 10);
+      const wa = parseInt(pa[2], 10);
+      const yb = parseInt(pb[1], 10);
+      const wb = parseInt(pb[2], 10);
+      if (ya !== yb) return ya - yb;
+      return wa - wb;
+    }
+  }
+  return la.localeCompare(lb);
+}
+
 function buildProjectStage(period) {
   if (period !== "week") {
     return { label: "$_id", revenue: 1, orders: 1, _id: 0 };
@@ -99,11 +124,7 @@ router.get("/reports/revenue", auth, isAdmin, async (req, res) => {
       : "day";
     const status = String(req.query.status || "delivered");
 
-    const parsedFrom = toDateOrNull(req.query.from);
-    const parsedTo = toDateOrNull(req.query.to);
-    const def = getDefaultRange(period);
-    const from = parsedFrom || def.from;
-    const to = parsedTo || def.to;
+    const { from, to } = resolveReportBounds(req.query.from, req.query.to, period);
 
     const match = {
       createdAt: { $gte: from, $lte: to }
@@ -162,18 +183,14 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
       : "day";
     const status = String(req.query.status || "delivered");
 
-    const parsedFrom = toDateOrNull(req.query.from);
-    const parsedTo = toDateOrNull(req.query.to);
-    const def = getDefaultRange(period);
-    const from = parsedFrom || def.from;
-    const to = parsedTo || def.to;
+    const { from, to } = resolveReportBounds(req.query.from, req.query.to, period);
 
     const orderMatch = { createdAt: { $gte: from, $lte: to } };
     if (status && status !== "all") orderMatch.status = status;
 
     const expenseMatch = { expenseDate: { $gte: from, $lte: to } };
 
-    const [revSeries, expSeries] = await Promise.all([
+    const [revSeries, expSeries, expenseTotalAgg] = await Promise.all([
       Order.aggregate([
         { $match: orderMatch },
         {
@@ -225,6 +242,10 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
                 }
               : { _id: 0, label: "$_id", expense: 1, items: 1 }
         }
+      ]),
+      Expense.aggregate([
+        { $match: expenseMatch },
+        { $group: { _id: null, total: { $sum: "$amount" } } }
       ])
     ]);
 
@@ -237,7 +258,7 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
       cur.expense = Number(e.expense || 0);
       byLabel.set(e.label, cur);
     }
-    const series = Array.from(byLabel.values()).sort((a, b) => String(a.label).localeCompare(String(b.label)));
+    const series = Array.from(byLabel.values()).sort((a, b) => compareReportLabels(period, a, b));
     const totals = series.reduce(
       (acc, x) => {
         acc.revenue += Number(x.revenue || 0);
@@ -247,6 +268,7 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
       },
       { revenue: 0, expense: 0, orders: 0 }
     );
+    totals.expense = Number(expenseTotalAgg[0]?.total || 0);
     totals.profit = totals.revenue - totals.expense;
 
     return res.json({
