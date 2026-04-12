@@ -4,7 +4,6 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "scripts": {
     "build": "(npm install) && (cd ../client-admin && npm install && npm run build) && (cd ../client-customer && npm install && npm run build)",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
