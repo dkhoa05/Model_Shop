@@ -30,7 +30,7 @@ if (envResult.error && process.env.NODE_ENV !== "test") {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:5174, https://model-shop-3.onrender.com")
+const allowedOrigins = (process.env.CORS_ORIGINS || "http://localhost:5173,http://localhost:5174, https://model-shop-3.onrender.com, https://model-shop-admin.onrender.com")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
