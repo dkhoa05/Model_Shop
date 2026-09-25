@@ -1,10 +1,12 @@
 import express from "express";
 import mongoose from "mongoose";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isStaff } from "../middlewares/auth.js";
 import { Coupon } from "../models/Coupon.js";
 import { ApprovalRequest } from "../models/ApprovalRequest.js";
+import { validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
 const DISCOUNT_APPROVAL_PERCENT_THRESHOLD = 50;
 const DISCOUNT_APPROVAL_FIXED_THRESHOLD = 2000000;
 
@@ -17,7 +19,7 @@ function parseApplicableProductIds(raw) {
   return ids;
 }
 
-router.get("/coupons", auth, isAdmin, async (req, res) => {
+router.get("/coupons", auth, isStaff, async (req, res) => {
   try {
     const list = await Coupon.find().sort({ createdAt: -1 }).lean();
     return res.json(list);
@@ -27,7 +29,7 @@ router.get("/coupons", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/coupons", auth, isAdmin, async (req, res) => {
+router.post("/coupons", auth, isStaff, async (req, res) => {
   try {
     const {
       code,
@@ -115,7 +117,7 @@ router.post("/coupons", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.put("/coupons/:id", auth, isAdmin, async (req, res) => {
+router.put("/coupons/:id", auth, isStaff, async (req, res) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ message: "ID không hợp lệ" });
@@ -193,7 +195,7 @@ router.put("/coupons/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.delete("/coupons/:id", auth, isAdmin, async (req, res) => {
+router.delete("/coupons/:id", auth, isStaff, async (req, res) => {
   try {
     const doc = await Coupon.findByIdAndDelete(req.params.id);
     if (!doc) return res.status(404).json({ message: "Không tìm thấy mã giảm giá" });

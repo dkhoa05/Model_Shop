@@ -1,5 +1,5 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isBackoffice } from "../middlewares/auth.js";
 import { Order } from "../models/Order.js";
 import { User } from "../models/User.js";
 import { Product } from "../models/Product.js";
@@ -11,7 +11,7 @@ import { ApprovalRequest } from "../models/ApprovalRequest.js";
 
 const router = express.Router();
 
-router.get("/stats", auth, isAdmin, async (req, res) => {
+router.get("/stats", auth, isBackoffice, async (req, res) => {
   try {
     const [orderCounts, paymentBreakdown, totals, customers, products, leads, suppliers, purchaseOrders, invoicesOpen, approvalsPending] = await Promise.all([
       Order.aggregate([
@@ -19,6 +19,7 @@ router.get("/stats", auth, isAdmin, async (req, res) => {
         { $sort: { _id: 1 } }
       ]),
       Order.aggregate([
+        { $match: { status: { $ne: "cancelled" } } },
         { $group: { _id: "$paymentMethod", count: { $sum: 1 }, revenue: { $sum: "$totalPrice" } } },
         { $sort: { revenue: -1 } }
       ]),
@@ -26,7 +27,8 @@ router.get("/stats", auth, isAdmin, async (req, res) => {
         {
           $group: {
             _id: null,
-            revenueAll: { $sum: "$totalPrice" },
+            // doanh thu không tính đơn đã hủy
+            revenueAll: { $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 0, "$totalPrice"] } },
             revenueDelivered: {
               $sum: {
                 $cond: [{ $eq: ["$status", "delivered"] }, "$totalPrice", 0]

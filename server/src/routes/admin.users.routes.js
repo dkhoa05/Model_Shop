@@ -1,9 +1,14 @@
 import express from "express";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { User } from "../models/User.js";
 import { auth, isAdmin } from "../middlewares/auth.js";
+import { escapeRegex, validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
+
+const STAFF_ROLES = ["admin", "staff", "accountant"];
 
 // List customers (role=user) with simple search
 router.get("/users", auth, isAdmin, async (req, res) => {
@@ -12,10 +17,10 @@ router.get("/users", auth, isAdmin, async (req, res) => {
     const filter = { role: "user" };
     if (q) {
       filter.$or = [
-        { name: { $regex: q, $options: "i" } },
-        { username: { $regex: q, $options: "i" } },
-        { email: { $regex: q, $options: "i" } },
-        { phone: { $regex: q, $options: "i" } }
+        { name: { $regex: escapeRegex(q.slice(0, 100)), $options: "i" } },
+        { username: { $regex: escapeRegex(q.slice(0, 100)), $options: "i" } },
+        { email: { $regex: escapeRegex(q.slice(0, 100)), $options: "i" } },
+        { phone: { $regex: escapeRegex(q.slice(0, 100)), $options: "i" } }
       ];
     }
     const users = await User.find(filter)
@@ -34,7 +39,7 @@ router.post("/users", auth, isAdmin, async (req, res) => {
     if (!name || !username || !email || !password) {
       return res.status(400).json({ message: "Họ tên, username, email, password là bắt buộc" });
     }
-    if (String(password).length < 6) {
+    if (String(password).length < 8) {
       return res.status(400).json({ message: "Mật khẩu phải có ít nhất 6 ký tự" });
     }
     const un = String(username).toLowerCase().trim();
@@ -129,12 +134,13 @@ router.put("/users/:id", auth, isAdmin, async (req, res) => {
 // Reset customer password (admin)
 router.post("/users/:id/reset-password", auth, isAdmin, async (req, res) => {
   try {
-    const DEFAULT_RESET_PASSWORD = process.env.DEFAULT_RESET_PASSWORD || "Admin@123";
     const user = await User.findOne({ _id: req.params.id, role: "user" });
     if (!user) return res.status(404).json({ message: "Customer not found" });
-    const hashed = await bcrypt.hash(String(DEFAULT_RESET_PASSWORD), 10);
-    await User.findByIdAndUpdate(user._id, { password: hashed });
-    return res.json({ message: `Đặt lại mật khẩu thành công. Mật khẩu mới: ${DEFAULT_RESET_PASSWORD}` });
+    // Mật khẩu tạm ngẫu nhiên (hiển thị 1 lần); mọi phiên cũ bị thu hồi
+    const tempPassword = `${crypto.randomBytes(6).toString("base64url")}9a`;
+    const hashed = await bcrypt.hash(tempPassword, 10);
+    await User.findByIdAndUpdate(user._id, { password: hashed, $inc: { tokenVersion: 1 } });
+    return res.json({ message: `Đặt lại mật khẩu thành công. Mật khẩu tạm (chỉ hiển thị một lần): ${tempPassword}` });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
@@ -155,14 +161,10 @@ router.delete("/users/:id", auth, isAdmin, async (req, res) => {
 router.get("/admins", auth, isAdmin, async (req, res) => {
   try {
     const q = String(req.query.q || "").trim();
-    const filter = { role: "admin" };
+    const filter = { role: { $in: STAFF_ROLES } };
     if (q) {
-      filter.$or = [
-        { name: { $regex: q, $options: "i" } },
-        { username: { $regex: q, $options: "i" } },
-        { email: { $regex: q, $options: "i" } },
-        { phone: { $regex: q, $options: "i" } }
-      ];
+      const rx = { $regex: escapeRegex(q.slice(0, 100)), $options: "i" };
+      filter.$or = [{ name: rx }, { username: rx }, { email: rx }, { phone: rx }];
     }
     const admins = await User.find(filter)
       .select("-password -resetToken -resetTokenExpiry")
@@ -176,12 +178,15 @@ router.get("/admins", auth, isAdmin, async (req, res) => {
 // Create admin account
 router.post("/admins", auth, isAdmin, async (req, res) => {
   try {
-    const { name, username, email, phone, avatarUrl, password } = req.body || {};
+    const { name, username, email, phone, avatarUrl, password, role } = req.body || {};
     if (!name || !username || !email || !password) {
       return res.status(400).json({ message: "Name, username, email, password are required" });
     }
-    if (String(password).length < 6) {
-      return res.status(400).json({ message: "Password must have at least 6 chars" });
+    if (role !== undefined && !STAFF_ROLES.includes(role)) {
+      return res.status(400).json({ message: "Vai trò không hợp lệ" });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ message: "Password must have at least 8 chars" });
     }
     const un = String(username).toLowerCase().trim();
     const em = String(email).toLowerCase().trim();
@@ -197,7 +202,7 @@ router.post("/admins", auth, isAdmin, async (req, res) => {
       phone: phone ? String(phone).trim() : "",
       avatarUrl: avatarUrl ? String(avatarUrl).trim() : "",
       password: hashed,
-      role: "admin",
+      role: role || "admin",
       isBlocked: false
     });
     return res.status(201).json({
@@ -216,15 +221,32 @@ router.post("/admins", auth, isAdmin, async (req, res) => {
 
 router.put("/admins/:id", auth, isAdmin, async (req, res) => {
   try {
-    const { name, phone, avatarUrl, isBlocked } = req.body || {};
+    const { name, phone, avatarUrl, isBlocked, role } = req.body || {};
     const update = {};
+    if (role !== undefined) {
+      if (!STAFF_ROLES.includes(role)) return res.status(400).json({ message: "Vai trò không hợp lệ" });
+      update.role = role;
+    }
     if (typeof name === "string") update.name = name.trim();
     if (typeof phone === "string") update.phone = phone.trim();
     if (typeof avatarUrl === "string") update.avatarUrl = avatarUrl.trim();
     if (typeof isBlocked === "boolean") update.isBlocked = isBlocked;
+    const self = String(req.params.id) === String(req.user._id);
+    if (self && (update.isBlocked || (update.role && update.role !== "admin"))) {
+      return res.status(400).json({ message: "Không thể tự chặn hoặc hạ quyền tài khoản của mình" });
+    }
+    // Luôn phải còn ít nhất 1 admin hoạt động
+    if (update.isBlocked || (update.role && update.role !== "admin")) {
+      const target = await User.findOne({ _id: req.params.id, role: "admin" }).select("_id");
+      if (target) {
+        const others = await User.countDocuments({ role: "admin", isBlocked: { $ne: true }, _id: { $ne: target._id } });
+        if (others === 0) return res.status(400).json({ message: "Phải còn ít nhất một admin hoạt động" });
+      }
+    }
+    if (update.isBlocked !== undefined || update.role) update.$inc = { tokenVersion: 1 };
 
     const admin = await User.findOneAndUpdate(
-      { _id: req.params.id, role: "admin" },
+      { _id: req.params.id, role: { $in: STAFF_ROLES } },
       update,
       { new: true }
     ).select("-password -resetToken -resetTokenExpiry");
@@ -237,12 +259,12 @@ router.put("/admins/:id", auth, isAdmin, async (req, res) => {
 
 router.post("/admins/:id/reset-password", auth, isAdmin, async (req, res) => {
   try {
-    const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || "Admin@123";
-    const admin = await User.findOne({ _id: req.params.id, role: "admin" });
+    const admin = await User.findOne({ _id: req.params.id, role: { $in: STAFF_ROLES } });
     if (!admin) return res.status(404).json({ message: "Admin not found" });
-    const hashed = await bcrypt.hash(String(defaultPassword), 10);
-    await User.findByIdAndUpdate(admin._id, { password: hashed });
-    return res.json({ message: `Reset thành công. Mật khẩu mới: ${defaultPassword}` });
+    const tempPassword = `${crypto.randomBytes(6).toString("base64url")}9a`;
+    const hashed = await bcrypt.hash(tempPassword, 10);
+    await User.findByIdAndUpdate(admin._id, { password: hashed, $inc: { tokenVersion: 1 } });
+    return res.json({ message: `Reset thành công. Mật khẩu tạm (chỉ hiển thị một lần): ${tempPassword}` });
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }

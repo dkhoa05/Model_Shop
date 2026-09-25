@@ -1,10 +1,12 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isStaff } from "../middlewares/auth.js";
 import { Lead } from "../models/Lead.js";
+import { validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
 
-router.get("/leads", auth, isAdmin, async (req, res) => {
+router.get("/leads", auth, isStaff, async (req, res) => {
   try {
     const { stage, q } = req.query;
     const filter = {};
@@ -24,7 +26,7 @@ router.get("/leads", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/leads", auth, isAdmin, async (req, res) => {
+router.post("/leads", auth, isStaff, async (req, res) => {
   try {
     const lead = await Lead.create(req.body);
     return res.status(201).json(lead);
@@ -33,7 +35,7 @@ router.post("/leads", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.put("/leads/:id", auth, isAdmin, async (req, res) => {
+router.put("/leads/:id", auth, isStaff, async (req, res) => {
   try {
     const lead = await Lead.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!lead) return res.status(404).json({ message: "Lead not found" });
@@ -43,7 +45,7 @@ router.put("/leads/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.delete("/leads/:id", auth, isAdmin, async (req, res) => {
+router.delete("/leads/:id", auth, isStaff, async (req, res) => {
   try {
     const lead = await Lead.findByIdAndDelete(req.params.id);
     if (!lead) return res.status(404).json({ message: "Lead not found" });

@@ -1,11 +1,14 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isBackoffice, isFinance } from "../middlewares/auth.js";
+import { User } from "../models/User.js";
 import { ApprovalRequest } from "../models/ApprovalRequest.js";
 import { Coupon } from "../models/Coupon.js";
 import { PurchaseOrder } from "../models/PurchaseOrder.js";
 import { Order } from "../models/Order.js";
+import { validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
 
 function deriveRequiredApprovals(type, payload = {}) {
   const amount = Number(payload.amount || payload.totalAmount || 0);
@@ -15,7 +18,7 @@ function deriveRequiredApprovals(type, payload = {}) {
   return 1;
 }
 
-router.get("/approvals", auth, isAdmin, async (req, res) => {
+router.get("/approvals", auth, isBackoffice, async (req, res) => {
   try {
     const approvals = await ApprovalRequest.find()
       .populate("requestedBy", "name email")
@@ -29,13 +32,21 @@ router.get("/approvals", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/approvals", auth, isAdmin, async (req, res) => {
+router.post("/approvals", auth, isBackoffice, async (req, res) => {
   try {
-    const payload = req.body || {};
+    const body = req.body || {};
+    const TYPES = ["discount", "refund", "purchase", "inventory_adjustment", "custom"];
+    const type = TYPES.includes(body.type) ? body.type : "custom";
+    const title = typeof body.title === "string" ? body.title.trim().slice(0, 200) : "";
+    if (!title) return res.status(400).json({ message: "Title is required" });
+    const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload : {};
+    // Chỉ whitelist field; status/steps/requiredApprovals luôn do server quyết định
     const approval = await ApprovalRequest.create({
-      ...payload,
-      requiredApprovals: payload.requiredApprovals || deriveRequiredApprovals(payload.type, payload.payload),
-      requestedBy: req.user?._id || null
+      type,
+      title,
+      payload,
+      requiredApprovals: deriveRequiredApprovals(type, payload),
+      requestedBy: req.user._id
     });
     return res.status(201).json(approval);
   } catch (error) {
@@ -43,7 +54,7 @@ router.post("/approvals", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/approvals/:id/decide", auth, isAdmin, async (req, res) => {
+router.post("/approvals/:id/decide", auth, isFinance, async (req, res) => {
   try {
     const { status, decisionNote } = req.body || {};
     if (!["approved", "rejected"].includes(status)) {
@@ -52,12 +63,16 @@ router.post("/approvals/:id/decide", auth, isAdmin, async (req, res) => {
     const approval = await ApprovalRequest.findById(req.params.id);
     if (!approval) return res.status(404).json({ message: "Approval request not found" });
     if (approval.status !== "pending") return res.status(400).json({ message: "Approval request already decided" });
-    if (
-      Number(approval.requiredApprovals || 1) > 1 &&
-      approval.requestedBy &&
-      String(approval.requestedBy) === String(req.user?._id)
-    ) {
-      return res.status(400).json({ message: "Requester cannot approve their own request" });
+    // Người tạo yêu cầu không được tự duyệt (trừ khi hệ thống chỉ còn 1 admin hoạt động)
+    if (approval.requestedBy && String(approval.requestedBy) === String(req.user?._id)) {
+      const otherAdmins = await User.countDocuments({
+        role: "admin",
+        isBlocked: { $ne: true },
+        _id: { $ne: req.user._id }
+      });
+      if (otherAdmins > 0) {
+        return res.status(400).json({ message: "Requester cannot approve their own request" });
+      }
     }
 
     const alreadyDecided = approval.approvalSteps.some((step) => String(step.approver) === String(req.user?._id));
