@@ -50,6 +50,14 @@ const orderSchema = new mongoose.Schema(
     paymentRef: { type: String, trim: true },
     paymentProofUrl: { type: String, trim: true },
     paymentProofSubmittedAt: { type: Date },
+    refundStatus: {
+      type: String,
+      enum: ["none", "pending_approval", "approved", "refunded"],
+      default: "none"
+    },
+    refundAmount: { type: Number, min: 0, default: 0 },
+    refundApprovalRequest: { type: mongoose.Schema.Types.ObjectId, ref: "ApprovalRequest", default: null },
+    refundedAt: { type: Date, default: null },
     status: {
       type: String,
       enum: ["pending", "processing", "shipped", "delivered", "cancelled"],
@@ -57,6 +65,18 @@ const orderSchema = new mongoose.Schema(
     }
   },
   { timestamps: true }
+);
+
+/** Mỗi tài khoản chỉ một đơn có cùng mã giảm giá (tránh tái sử dụng + race) */
+orderSchema.index(
+  { user: 1, couponCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      user: { $type: "objectId" },
+      couponCode: { $type: "string", $gt: "" }
+    }
+  }
 );
 
 export const Order = mongoose.model("Order", orderSchema);

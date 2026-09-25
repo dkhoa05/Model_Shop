@@ -1,16 +1,16 @@
 import express from "express";
 import { auth, isAdmin } from "../middlewares/auth.js";
 import { Expense } from "../models/Expense.js";
+import { parseOptionalDayBounds } from "../utils/dateRangeQuery.js";
 
 const router = express.Router();
 
 router.get("/expenses", auth, isAdmin, async (req, res) => {
   try {
-    const from = req.query.from ? new Date(String(req.query.from)) : null;
-    const to = req.query.to ? new Date(String(req.query.to)) : null;
+    const { from, to } = parseOptionalDayBounds(req.query.from, req.query.to);
     const match = {};
-    if (from && !Number.isNaN(from.getTime())) match.expenseDate = { ...(match.expenseDate || {}), $gte: from };
-    if (to && !Number.isNaN(to.getTime())) match.expenseDate = { ...(match.expenseDate || {}), $lte: to };
+    if (from) match.expenseDate = { ...(match.expenseDate || {}), $gte: from };
+    if (to) match.expenseDate = { ...(match.expenseDate || {}), $lte: to };
 
     const items = await Expense.find(match).sort({ expenseDate: -1, createdAt: -1 });
     return res.json(items);

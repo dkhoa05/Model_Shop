@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import { User } from "../models/User.js";
 import { auth } from "../middlewares/auth.js";
+import { sendPasswordResetEmail } from "../services/mail.js";
 
 const router = express.Router();
 
@@ -144,25 +145,57 @@ router.post("/change-password", auth, async (req, res) => {
 });
 
 router.post("/forgot-password", async (req, res) => {
+  const genericMessage =
+    "Nếu email đã đăng ký trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu trong vài phút. Hãy kiểm tra cả mục Thư rác.";
+
   try {
     const { email } = req.body;
     if (!email) return res.status(400).json({ message: "Vui lòng nhập email" });
-    const user = await User.findOne({ email: String(email).toLowerCase().trim() });
-    if (!user) return res.status(400).json({ message: "Không tìm thấy tài khoản với email này" });
+    const em = String(email).toLowerCase().trim();
+    const user = await User.findOne({ email: em });
+
+    const baseUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+
+    if (!user) {
+      return res.json({ message: genericMessage });
+    }
 
     const token = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
     const expiry = new Date(Date.now() + 60 * 60 * 1000);
     await User.findByIdAndUpdate(user._id, { resetToken: tokenHash, resetTokenExpiry: expiry });
 
-    const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const resetLink = `${baseUrl}/reset-password?token=${token}`;
-    // In production you should email the link; for this project we only return it in development.
-    if (process.env.NODE_ENV === "production") {
-      return res.json({ message: "Nếu email tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu." });
+    const resetLink = `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
+    const mailResult = await sendPasswordResetEmail({
+      to: user.email,
+      name: user.name,
+      resetLink
+    });
+
+    if (mailResult.sent) {
+      return res.json({ message: genericMessage });
     }
-    return res.json({ message: "Link đặt lại mật khẩu đã được tạo.", resetLink });
+
+    const isDev = process.env.NODE_ENV !== "production";
+    if (isDev) {
+      const msgNotConfigured =
+        "Chưa đọc được SMTP trong .env — kiểm tra file server/.env có SMTP_HOST, SMTP_USER, SMTP_PASS; lưu file và restart server.";
+      const msgSendFailed =
+        "SMTP đã cấu hình nhưng gửi thất bại (sai mật khẩu ứng dụng, chưa bật 2FA Gmail, v.v.). Xem log terminal [mail]. Dưới đây là link dev để thử.";
+      return res.json({
+        message:
+          mailResult.reason === "send_failed" ? msgSendFailed : msgNotConfigured,
+        resetLink,
+        devReason: mailResult.reason || "unknown"
+      });
+    }
+
+    return res.status(503).json({
+      message:
+        "Không thể gửi email lúc này. Vui lòng thử lại sau hoặc liên hệ quản trị (kiểm tra SMTP trên server)."
+    });
   } catch (error) {
+    console.error("[forgot-password]", error);
     return res.status(500).json({ message: "Server error" });
   }
 });

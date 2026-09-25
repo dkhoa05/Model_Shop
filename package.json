@@ -2,15 +2,21 @@
   "name": "model-shop",
   "version": "1.0.0",
   "private": true,
-  "scripts": {
-    "dev:server": "nodemon server/src/server.js",
-    "start:server": "node server/src/server.js",
-    "dev:customer": "npm run dev --workspace client-customer",
-    "dev:admin": "npm run dev --workspace client-admin"
-  },
   "workspaces": [
     "server",
     "client-customer",
     "client-admin"
-  ]
+  ],
+  "scripts": {
+    "dev:server": "nodemon server/src/server.js",
+    "start:server": "node server/src/server.js",
+    "dev:customer": "npm run dev --workspace client-customer",
+    "dev:admin": "npm run dev --workspace client-admin",
+    "dev:all": "start \"server\" cmd /k npm run dev:server && start \"customer\" cmd /k npm run dev:customer && start \"admin\" cmd /k npm run dev:admin",
+    "ensure-admin": "npm run ensure-admin --workspace server",
+    "build:customer": "npm run build --workspace client-customer",
+    "build:admin": "npm run build --workspace client-admin",
+    "build": "npm run build:customer && npm run build:admin",
+    "start": "node server/src/server.js"
+  }
 }

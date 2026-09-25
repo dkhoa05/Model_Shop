@@ -1,4 +1,6 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import { connectDB } from "./config/db.js";
 import { User } from "./models/User.js";
@@ -6,8 +8,10 @@ import { Product } from "./models/Product.js";
 import { Order } from "./models/Order.js";
 import { PaymentConfig } from "./models/PaymentConfig.js";
 import { Expense } from "./models/Expense.js";
+import { Coupon } from "./models/Coupon.js";
 
-dotenv.config();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, "../.env") });
 
 /** Ảnh đúng theo danh mục sản phẩm (Unsplash, free). */
 const IMAGE_BY_CATEGORY = {
@@ -555,6 +559,37 @@ const run = async () => {
     {},
     {},
     { upsert: true, new: true }
+  );
+
+  await Coupon.findOneAndUpdate(
+    { code: "WELCOME10" },
+    {
+      $set: {
+        type: "percent",
+        value: 10,
+        maxDiscountAmount: 100000,
+        minOrderSubtotal: 0,
+        active: true,
+        description: "Giảm 10% tối đa 100.000 ₫"
+      },
+      $setOnInsert: { code: "WELCOME10", usedCount: 0 }
+    },
+    { upsert: true }
+  );
+  await Coupon.findOneAndUpdate(
+    { code: "MODEL50K" },
+    {
+      $set: {
+        type: "fixed",
+        value: 50000,
+        maxDiscountAmount: null,
+        minOrderSubtotal: 0,
+        active: true,
+        description: "Giảm 50.000 ₫"
+      },
+      $setOnInsert: { code: "MODEL50K", usedCount: 0 }
+    },
+    { upsert: true }
   );
 
   console.log("Seed done.");

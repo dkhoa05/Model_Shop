@@ -9,6 +9,10 @@ node_modules/
 # Build
 dist/
 build/
+.next/
+client-customer/.next/
+client-admin/.next/
+*.tsbuildinfo
 *.local
 
 # Logs

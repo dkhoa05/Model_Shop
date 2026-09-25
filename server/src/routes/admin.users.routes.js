@@ -151,5 +151,102 @@ router.delete("/users/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
+// List admin accounts
+router.get("/admins", auth, isAdmin, async (req, res) => {
+  try {
+    const q = String(req.query.q || "").trim();
+    const filter = { role: "admin" };
+    if (q) {
+      filter.$or = [
+        { name: { $regex: q, $options: "i" } },
+        { username: { $regex: q, $options: "i" } },
+        { email: { $regex: q, $options: "i" } },
+        { phone: { $regex: q, $options: "i" } }
+      ];
+    }
+    const admins = await User.find(filter)
+      .select("-password -resetToken -resetTokenExpiry")
+      .sort({ createdAt: -1 });
+    return res.json(admins);
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+// Create admin account
+router.post("/admins", auth, isAdmin, async (req, res) => {
+  try {
+    const { name, username, email, phone, avatarUrl, password } = req.body || {};
+    if (!name || !username || !email || !password) {
+      return res.status(400).json({ message: "Name, username, email, password are required" });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ message: "Password must have at least 6 chars" });
+    }
+    const un = String(username).toLowerCase().trim();
+    const em = String(email).toLowerCase().trim();
+    const existing = await User.findOne({ $or: [{ email: em }, { username: un }] });
+    if (existing) {
+      return res.status(400).json({ message: "Email or username already exists" });
+    }
+    const hashed = await bcrypt.hash(String(password), 10);
+    const admin = await User.create({
+      name: String(name).trim(),
+      username: un,
+      email: em,
+      phone: phone ? String(phone).trim() : "",
+      avatarUrl: avatarUrl ? String(avatarUrl).trim() : "",
+      password: hashed,
+      role: "admin",
+      isBlocked: false
+    });
+    return res.status(201).json({
+      id: admin._id,
+      name: admin.name,
+      username: admin.username,
+      email: admin.email,
+      phone: admin.phone,
+      role: admin.role,
+      createdAt: admin.createdAt
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.put("/admins/:id", auth, isAdmin, async (req, res) => {
+  try {
+    const { name, phone, avatarUrl, isBlocked } = req.body || {};
+    const update = {};
+    if (typeof name === "string") update.name = name.trim();
+    if (typeof phone === "string") update.phone = phone.trim();
+    if (typeof avatarUrl === "string") update.avatarUrl = avatarUrl.trim();
+    if (typeof isBlocked === "boolean") update.isBlocked = isBlocked;
+
+    const admin = await User.findOneAndUpdate(
+      { _id: req.params.id, role: "admin" },
+      update,
+      { new: true }
+    ).select("-password -resetToken -resetTokenExpiry");
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+    return res.json(admin);
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
+router.post("/admins/:id/reset-password", auth, isAdmin, async (req, res) => {
+  try {
+    const defaultPassword = process.env.DEFAULT_ADMIN_PASSWORD || "Admin@123";
+    const admin = await User.findOne({ _id: req.params.id, role: "admin" });
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+    const hashed = await bcrypt.hash(String(defaultPassword), 10);
+    await User.findByIdAndUpdate(admin._id, { password: hashed });
+    return res.json({ message: `Reset thành công. Mật khẩu mới: ${defaultPassword}` });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
+  }
+});
+
 export default router;
 

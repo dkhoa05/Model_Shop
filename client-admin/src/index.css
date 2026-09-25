@@ -2,7 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  box-sizing: border-box;
+}
+
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #07080b;
+}
+
+@layer components {
+  .admin-input {
+    @apply h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-red-500;
+  }
+
+  .admin-button-secondary {
+    @apply rounded-xl border border-zinc-700 px-4 py-2 text-xs font-black uppercase text-zinc-200 transition hover:border-red-500 hover:text-red-300;
+  }
 }
 

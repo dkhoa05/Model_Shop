@@ -3,12 +3,17 @@ import { auth, isAdmin } from "../middlewares/auth.js";
 import { Order } from "../models/Order.js";
 import { User } from "../models/User.js";
 import { Product } from "../models/Product.js";
+import { Lead } from "../models/Lead.js";
+import { Supplier } from "../models/Supplier.js";
+import { PurchaseOrder } from "../models/PurchaseOrder.js";
+import { Invoice } from "../models/Invoice.js";
+import { ApprovalRequest } from "../models/ApprovalRequest.js";
 
 const router = express.Router();
 
 router.get("/stats", auth, isAdmin, async (req, res) => {
   try {
-    const [orderCounts, paymentBreakdown, totals, customers, products] = await Promise.all([
+    const [orderCounts, paymentBreakdown, totals, customers, products, leads, suppliers, purchaseOrders, invoicesOpen, approvalsPending] = await Promise.all([
       Order.aggregate([
         { $group: { _id: "$status", count: { $sum: 1 } } },
         { $sort: { _id: 1 } }
@@ -32,7 +37,12 @@ router.get("/stats", auth, isAdmin, async (req, res) => {
         }
       ]),
       User.countDocuments({ role: "user" }),
-      Product.countDocuments({})
+      Product.countDocuments({}),
+      Lead.countDocuments({}),
+      Supplier.countDocuments({ active: true }),
+      PurchaseOrder.countDocuments({ status: { $in: ["draft", "ordered"] } }),
+      Invoice.countDocuments({ status: { $in: ["draft", "posted"] } }),
+      ApprovalRequest.countDocuments({ status: "pending" })
     ]);
 
     const counts = Object.fromEntries(orderCounts.map((x) => [x._id, x.count]));
@@ -58,6 +68,11 @@ router.get("/stats", auth, isAdmin, async (req, res) => {
       },
       customers,
       products,
+      leads,
+      suppliers,
+      purchaseOrdersOpen: purchaseOrders,
+      invoicesOpen,
+      approvalsPending,
       payment
     });
   } catch (error) {
