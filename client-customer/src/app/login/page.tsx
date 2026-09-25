@@ -9,8 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [identifier, setIdentifier] = useState("admin");
-  const [password, setPassword] = useState("admin");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,7 +21,11 @@ export default function LoginPage() {
 
     try {
       const user = await login(identifier, password);
-      router.push(user.role === "admin" ? "/admin" : "/checkout");
+      if (user.role !== "customer") {
+        window.location.href = process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:5174";
+        return;
+      }
+      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không đăng nhập được. Vui lòng thử lại.");
     } finally {
@@ -35,7 +39,7 @@ export default function LoginPage() {
         <p className="text-xs font-black uppercase tracking-[0.24em] text-red-400">Account</p>
         <h1 className="mt-3 font-space-grotesk text-3xl font-black uppercase text-white">Đăng nhập</h1>
         <p className="mt-3 text-sm leading-6 text-zinc-400">
-          Đăng nhập để lưu thông tin giao hàng, xem lịch sử đơn, dùng mã giảm giá và truy cập dashboard nếu là admin.
+          Đăng nhập để lưu thông tin giao hàng, xem lịch sử đơn, dùng mã giảm giá.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
@@ -48,6 +52,7 @@ export default function LoginPage() {
             <input className="input" value={password} onChange={(event) => setPassword(event.target.value)} type="password" required />
           </label>
           {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-200">{error}</p>}
+          <Link href="/forgot-password" className="text-right text-xs font-bold text-red-400 hover:text-red-300">Quên mật khẩu?</Link>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
@@ -55,9 +60,6 @@ export default function LoginPage() {
 
         <p className="mt-5 text-center text-sm text-zinc-400">
           Chưa có tài khoản? <Link href="/register" className="font-bold text-red-400 hover:text-red-300">Đăng ký ngay</Link>
-        </p>
-        <p className="mt-3 rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-3 text-xs leading-5 text-cyan-100">
-          Admin mặc định: admin / admin
         </p>
       </section>
     </div>

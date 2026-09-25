@@ -47,7 +47,7 @@ export default function RegisterPage() {
             <Field label="Email"><input className="input" value={form.email} onChange={(event) => update("email", event.target.value)} type="email" required /></Field>
           </div>
           <Field label="Địa chỉ mặc định"><textarea className="input min-h-24 py-3" value={form.address} onChange={(event) => update("address", event.target.value)} required /></Field>
-          <Field label="Mật khẩu"><input className="input" value={form.password} onChange={(event) => update("password", event.target.value)} type="password" minLength={6} required /></Field>
+          <Field label="Mật khẩu"><input className="input" value={form.password} onChange={(event) => update("password", event.target.value)} type="password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,72}" title="8-72 ký tự, gồm chữ và số" required /></Field>
           {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-200">{error}</p>}
           <Button type="submit" className="w-full" disabled={loading}>{loading ? "Đang tạo..." : "Tạo tài khoản"}</Button>
         </form>

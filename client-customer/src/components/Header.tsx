@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Heart, Menu, Search, ShoppingCart, User, X, Zap } from "lucide-react";
 import { mainNavigation, siteConfig } from "@/config/site";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { searchProducts } from "@/lib/products";
+import { searchProductsFromApi } from "@/lib/products";
+import type { Product } from "@/types/product";
 import { formatVND } from "@/utils/currency";
 
 export default function Header() {
@@ -20,7 +21,20 @@ export default function Header() {
   const [query, setQuery] = useState("");
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const results = useMemo(() => searchProducts(query, 4), [query]);
+  const [results, setResults] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      searchProductsFromApi(query, 4, controller.signal)
+        .then(setResults)
+        .catch(() => setResults([]));
+    }, 250);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [query]);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -129,7 +143,7 @@ export default function Header() {
                     <p className="text-sm font-black">{user.name}</p>
                     <p className="mt-1 truncate text-xs text-zinc-500">{user.email}</p>
                   </div>
-                  {user.role === "admin" && <Link href="/admin" onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2 text-sm font-bold text-cyan-300 hover:bg-zinc-900">Admin dashboard</Link>}
+                  {user.role !== "customer" && <a href={process.env.NEXT_PUBLIC_ADMIN_URL || "http://localhost:5174"} onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2 text-sm font-bold text-cyan-300 hover:bg-zinc-900">Admin dashboard</a>}
                   <Link href="/profile" onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900">Hồ sơ khách hàng</Link>
                   <Link href="/orders" onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900">Lịch sử đơn hàng</Link>
                   <Link href="/checkout" onClick={() => setAccountOpen(false)} className="block rounded-xl px-3 py-2 text-sm font-bold text-zinc-300 hover:bg-zinc-900">Thanh toán</Link>
