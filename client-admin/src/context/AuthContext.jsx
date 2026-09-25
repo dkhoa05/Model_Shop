@@ -5,18 +5,36 @@ const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  /** false khi còn token nhưng chưa xong GET /auth/me (tránh F5 bị đẩy sang /login rồi về /admin/products) */
+  const [authReady, setAuthReady] = useState(() => !localStorage.getItem("token"));
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setUser(null);
+      setAuthReady(true);
+      return;
+    }
+    let cancelled = false;
+    setAuthReady(false);
     api
       .get(`/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((res) => setUser(res.data))
+      .then((res) => {
+        if (!cancelled) setUser(res.data);
+      })
       .catch(() => {
-        setUser(null);
-        setToken("");
-        localStorage.removeItem("token");
+        if (!cancelled) {
+          setUser(null);
+          setToken("");
+          localStorage.removeItem("token");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const login = (jwt, userInfo) => {
@@ -32,7 +50,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, authReady, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

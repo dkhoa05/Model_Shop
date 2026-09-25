@@ -172,7 +172,7 @@ export default function AdminOrdersPage() {
                       rel="noreferrer"
                       className="px-3 py-1.5 rounded-lg text-xs border border-slate-700 text-slate-200 hover:border-cyan-400 transition"
                     >
-                      Xem bill
+                      Xem minh chứng
                     </a>
                     {o.paymentStatus !== "paid" && (
                       <button
@@ -180,7 +180,7 @@ export default function AdminOrdersPage() {
                         onClick={() => confirmByProof(o)}
                         className="px-3 py-1.5 rounded-lg text-xs bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 transition"
                       >
-                        Duyệt bill
+                        Duyệt đơn hàng
                       </button>
                     )}
                   </>

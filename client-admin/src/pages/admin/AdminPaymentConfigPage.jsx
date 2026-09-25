@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useTheme } from "../../context/ThemeContext.jsx";
 import { api } from "../../services/api.js";
 import { resolvePublicUrl } from "../../utils/publicUrl.js";
@@ -17,6 +18,24 @@ export default function AdminPaymentConfigPage() {
     zalopayPhone: ""
   });
   const [qrFile, setQrFile] = useState(null);
+  /** Preview file vừa chọn (blob URL) */
+  const [qrObjectUrl, setQrObjectUrl] = useState(null);
+  const [qrImgFailed, setQrImgFailed] = useState(false);
+
+  useEffect(() => {
+    if (!qrFile) {
+      setQrObjectUrl(null);
+      return;
+    }
+    const u = URL.createObjectURL(qrFile);
+    setQrObjectUrl(u);
+    setQrImgFailed(false);
+    return () => {
+      // Trì revoke 1 tick để <img> kịp đổi sang URL server (tránh revoke trước khi đổi src → onError → qrImgFailed kẹt)
+      const revoke = u;
+      window.setTimeout(() => URL.revokeObjectURL(revoke), 0);
+    };
+  }, [qrFile]);
 
   const inputClass =
     theme === "dark"
@@ -43,8 +62,18 @@ export default function AdminPaymentConfigPage() {
         });
       })
       .catch(() => setMsg("Không tải được cấu hình."))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setQrImgFailed(false);
+      });
   }, []);
+
+  const qrResolvedSrc =
+    qrObjectUrl || (form.qrImageUrl ? resolvePublicUrl(form.qrImageUrl) : "");
+
+  useEffect(() => {
+    setQrImgFailed(false);
+  }, [form.qrImageUrl, qrObjectUrl]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -70,6 +99,7 @@ export default function AdminPaymentConfigPage() {
       });
       setForm((f) => ({ ...f, qrImageUrl: qrUrl }));
       setQrFile(null);
+      setQrImgFailed(false);
       setMsg("Đã lưu cấu hình thanh toán.");
     } catch (err) {
       setMsg(err.response?.data?.message || "Không lưu được.");
@@ -86,6 +116,19 @@ export default function AdminPaymentConfigPage() {
 
   return (
     <div className="space-y-4">
+      <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+        <Link
+          to="/admin/products"
+          className={
+            "font-medium hover:underline " +
+            (theme === "dark" ? "text-cyan-400 hover:text-cyan-300" : "text-rose-600 hover:text-rose-700")
+          }
+        >
+          ← Sản phẩm
+        </Link>
+        <span aria-hidden="true">/</span>
+        <span className="text-slate-600 dark:text-slate-300">Cấu hình thanh toán</span>
+      </nav>
       <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
         Cấu hình thanh toán
       </h2>
@@ -157,18 +200,42 @@ export default function AdminPaymentConfigPage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   className="text-sm text-slate-600 dark:text-slate-300"
-                  onChange={(e) => setQrFile(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    setQrFile(e.target.files?.[0] || null);
+                    setQrImgFailed(false);
+                  }}
                 />
-                {form.qrImageUrl && (
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={resolvePublicUrl(form.qrImageUrl)}
-                      alt="QR"
-                      className="h-20 w-20 max-w-full object-contain rounded-lg border border-slate-600"
-                    />
-                    <span className="text-xs text-slate-500">Ảnh hiện tại</span>
+                {qrResolvedSrc ? (
+                  <div className="flex flex-wrap items-start gap-2">
+                    <div className="relative">
+                      {!qrImgFailed ? (
+                        <img
+                          key={qrResolvedSrc}
+                          src={qrResolvedSrc}
+                          alt="QR ngân hàng"
+                          className="h-28 w-28 max-w-full object-contain rounded-lg border border-slate-600 bg-slate-900/50"
+                          onError={() => setQrImgFailed(true)}
+                        />
+                      ) : (
+                        <div className="h-28 w-28 rounded-lg border border-dashed border-amber-500/50 bg-slate-900/50 p-2 text-[10px] text-amber-200/90 leading-snug">
+                          Không tải được ảnh. Kiểm tra backend đang chạy và đường dẫn tĩnh{" "}
+                          <code className="text-cyan-300">/uploads</code>. Nếu{" "}
+                          <code className="text-cyan-300">VITE_API_BASE=/api</code>, đặt{" "}
+                          <code className="text-cyan-300">VITE_PUBLIC_UPLOAD_ORIGIN</code> trỏ tới server
+                          API.
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs text-slate-500 max-w-[12rem]">
+                      {qrObjectUrl ? "Ảnh preview (chưa lưu)" : "Ảnh hiện tại"}
+                      {form.qrImageUrl && !qrObjectUrl && (
+                        <span className="block mt-1 font-mono text-[10px] text-slate-600 dark:text-slate-500 break-all">
+                          {resolvePublicUrl(form.qrImageUrl)}
+                        </span>
+                      )}
+                    </span>
                   </div>
-                )}
+                ) : null}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Tải ảnh QR lên hoặc giữ ảnh cũ. Khách sẽ quét mã này để chuyển khoản.
