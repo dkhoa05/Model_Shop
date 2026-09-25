@@ -5,7 +5,7 @@ const API_TARGET = process.env.VITE_API_TARGET || "http://localhost:5000";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/admin/",
+  base: process.env.VITE_BASE || "/",
   server: {
     port: 5174,
     proxy: {

@@ -1,8 +1,16 @@
 import React from "react";
 import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import LoginPage from "./pages/LoginPage.jsx";
+import AdminProductsPage from "./pages/admin/AdminProductsPage.jsx";
+import AdminOrdersPage from "./pages/admin/AdminOrdersPage.jsx";
+import AdminUsersPage from "./pages/admin/AdminUsersPage.jsx";
+import AdminCouponsPage from "./pages/admin/AdminCouponsPage.jsx";
+import AdminReportsPage from "./pages/admin/AdminReportsPage.jsx";
+import AdminExpensesPage from "./pages/admin/AdminExpensesPage.jsx";
+import AdminPaymentConfigPage from "./pages/admin/AdminPaymentConfigPage.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
 import { api, API_BASE } from "./services/api.js";
+import { BACKOFFICE_ROLES, ROLE_LABELS, canAccess } from "./lib/roles.js";
 
 const navItems = [
   { label: "Dashboard", href: "/admin" },
@@ -17,20 +25,25 @@ const navItems = [
   { label: "Accounting", href: "/admin/accounting" },
   { label: "Approvals", href: "/admin/approvals" },
   { label: "Coupons", href: "/admin/coupons" },
+  { label: "Expenses", href: "/admin/expenses" },
+  { label: "Sales Reports", href: "/admin/sales-reports" },
   { label: "Reports", href: "/admin/reports" },
+  { label: "Payment Config", href: "/admin/payment-config" },
   { label: "Settings", href: "/admin/settings" }
 ];
 
-const orderStatuses = ["pending", "processing", "shipped", "delivered", "cancelled"];
 const leadStages = ["new", "qualified", "proposal", "won", "lost"];
 const approvalTypes = ["discount", "refund", "purchase", "inventory_adjustment", "custom"];
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, authReady } = useAuth();
+  if (!authReady) {
+    return <p className="p-8 text-sm text-slate-400" role="status">Đang xác thực phiên đăng nhập…</p>;
+  }
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/*" element={user?.role === "admin" ? <AdminLayout /> : <Navigate to="/login" replace />} />
+      <Route path="/*" element={BACKOFFICE_ROLES.includes(user?.role) ? <AdminLayout /> : <Navigate to="/login" replace />} />
     </Routes>
   );
 }
@@ -54,7 +67,7 @@ function AdminLayout() {
             </a>
             <div className="hidden text-right sm:block">
               <p className="text-sm font-bold">{user?.name || "Admin"}</p>
-              <p className="text-xs text-zinc-500">{user?.email}</p>
+              <p className="text-xs text-zinc-500">{user?.email} · {ROLE_LABELS[user?.role] || user?.role}</p>
             </div>
             <button onClick={logout} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">
               Logout
@@ -67,7 +80,7 @@ function AdminLayout() {
         <aside className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3 lg:sticky lg:top-24">
           <p className="px-3 text-xs font-black uppercase tracking-[0.2em] text-red-400">Modules</p>
           <nav className="mt-2 grid gap-1">
-            {navItems.map((item) => {
+            {navItems.filter((item) => canAccess(user?.role, item.href)).map((item) => {
               const active = location.pathname === item.href;
               return (
                 <Link key={item.href} to={item.href} className={`rounded-xl px-3 py-2 text-sm font-bold transition ${active ? "bg-red-600 text-white" : "text-zinc-300 hover:bg-zinc-950 hover:text-white"}`}>
@@ -83,19 +96,22 @@ function AdminLayout() {
           <Routes>
             <Route path="/" element={<Navigate to="/admin" replace />} />
             <Route path="/admin" element={<DashboardView />} />
-            <Route path="/admin/products" element={<ProductsView />} />
-            <Route path="/admin/orders" element={<OrdersView />} />
-            <Route path="/admin/customers" element={<CustomersView />} />
-            <Route path="/admin/inventory" element={<InventoryView />} />
-            <Route path="/admin/movements" element={<MovementsView />} />
-            <Route path="/admin/leads" element={<LeadsView />} />
-            <Route path="/admin/suppliers" element={<SuppliersView />} />
-            <Route path="/admin/purchase-orders" element={<PurchaseOrdersView />} />
-            <Route path="/admin/accounting" element={<AccountingView />} />
-            <Route path="/admin/approvals" element={<ApprovalsView />} />
-            <Route path="/admin/coupons" element={<CouponsView />} />
-            <Route path="/admin/reports" element={<ReportsView />} />
-            <Route path="/admin/settings" element={<SettingsView />} />
+            <Route path="/admin/products" element={canAccess(user?.role, "/admin/products") ? <AdminProductsPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/orders" element={canAccess(user?.role, "/admin/orders") ? <AdminOrdersPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/customers" element={canAccess(user?.role, "/admin/customers") ? <AdminUsersPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/inventory" element={canAccess(user?.role, "/admin/inventory") ? <InventoryView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/movements" element={canAccess(user?.role, "/admin/movements") ? <MovementsView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/leads" element={canAccess(user?.role, "/admin/leads") ? <LeadsView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/suppliers" element={canAccess(user?.role, "/admin/suppliers") ? <SuppliersView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/purchase-orders" element={canAccess(user?.role, "/admin/purchase-orders") ? <PurchaseOrdersView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/accounting" element={canAccess(user?.role, "/admin/accounting") ? <AccountingView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/approvals" element={canAccess(user?.role, "/admin/approvals") ? <ApprovalsView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/coupons" element={canAccess(user?.role, "/admin/coupons") ? <AdminCouponsPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/expenses" element={canAccess(user?.role, "/admin/expenses") ? <AdminExpensesPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/sales-reports" element={canAccess(user?.role, "/admin/sales-reports") ? <AdminReportsPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/reports" element={canAccess(user?.role, "/admin/reports") ? <ReportsView /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/payment-config" element={canAccess(user?.role, "/admin/payment-config") ? <AdminPaymentConfigPage /> : <Navigate to="/admin" replace />} />
+            <Route path="/admin/settings" element={canAccess(user?.role, "/admin/settings") ? <SettingsView /> : <Navigate to="/admin" replace />} />
             <Route path="*" element={<Navigate to="/admin" replace />} />
           </Routes>
         </main>
@@ -123,73 +139,6 @@ function DashboardView() {
         <MetricCard label="Open PO" value={String(stats?.purchaseOrdersOpen || 0)} />
         <MetricCard label="Open Invoices" value={String(stats?.invoicesOpen || 0)} />
         <MetricCard label="Approvals Pending" value={String(stats?.approvalsPending || 0)} />
-      </div>
-    </section>
-  );
-}
-
-function ProductsView() {
-  const [products, setProducts] = React.useState([]);
-  React.useEffect(() => {
-    api.get("/products").then((res) => setProducts(res.data)).catch(() => setProducts([]));
-  }, []);
-  return (
-    <section className="space-y-4">
-      <PageHeader title="Products" description={`Tong ${products.length} san pham`} />
-      <Panel title="Catalog">
-        <SimpleProductTable products={products} />
-      </Panel>
-    </section>
-  );
-}
-
-function OrdersView() {
-  const [orders, setOrders] = React.useState([]);
-  const load = React.useCallback(() => api.get("/orders").then((res) => setOrders(res.data)).catch(() => setOrders([])), []);
-  React.useEffect(() => void load(), [load]);
-  const updateStatus = async (id, status) => {
-    await api.put(`/orders/${id}`, { status });
-    load();
-  };
-  return (
-    <section className="space-y-4">
-      <PageHeader title="Orders" description={`Tong ${orders.length} don hang`} />
-      <Panel title="Order pipeline">
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-3">Code</th><th>Customer</th><th>Status</th><th className="text-right">Total</th></tr></thead>
-            <tbody className="divide-y divide-zinc-800 text-zinc-300">
-              {orders.map((o) => (
-                <tr key={o._id}>
-                  <td className="py-3 font-bold text-white">{String(o._id).slice(-8).toUpperCase()}</td>
-                  <td>{o.user?.name || o.recipientName || "Guest"}</td>
-                  <td><select className="admin-input h-9 min-w-32" value={o.status} onChange={(e) => updateStatus(o._id, e.target.value)}>{orderStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select></td>
-                  <td className="text-right text-red-300">{formatVND(o.totalPrice)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
-    </section>
-  );
-}
-
-function CustomersView() {
-  const [orders, setOrders] = React.useState([]);
-  React.useEffect(() => { api.get("/orders").then((res) => setOrders(res.data)).catch(() => setOrders([])); }, []);
-  const customers = Array.from(new Map(orders.map((o) => [o.user?.email || o.phone, o])).values());
-  return (
-    <section className="space-y-4">
-      <PageHeader title="Customers" description={`Tong ${customers.length} khach mua hang`} />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {customers.map((c) => (
-          <article key={c._id} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-            <h3 className="font-black text-white">{c.user?.name || c.recipientName || "Guest"}</h3>
-            <p className="text-sm text-zinc-400">{c.user?.email || c.guestEmail || "No email"}</p>
-            <p className="text-sm text-zinc-400">{c.phone || "No phone"}</p>
-          </article>
-        ))}
       </div>
     </section>
   );
@@ -351,8 +300,27 @@ function AccountingView() {
   React.useEffect(() => void load(), [load]);
   const createFromOrder = async (orderId) => { await api.post(`/admin/invoices/from-order/${orderId}`); load(); };
   const markPaid = async (invoiceId) => { await api.put(`/admin/invoices/${invoiceId}`, { status: "paid" }); load(); };
-  const requestRefund = async (orderId) => { await api.post(`/orders/${orderId}/refund-request`); load(); };
-  const executeRefund = async (orderId) => { await api.post(`/orders/${orderId}/refund/execute`); load(); };
+  const requestRefund = async (orderId) => {
+    const reason = window.prompt("Lý do hoàn tiền (bắt buộc):");
+    if (!reason || !reason.trim()) return;
+    try {
+      await api.post(`/orders/${orderId}/refund-request`, { reason: reason.trim() });
+    } catch (err) {
+      window.alert(err?.response?.data?.message || "Không tạo được yêu cầu hoàn tiền");
+    }
+    load();
+  };
+  const executeRefund = async (orderId, order) => {
+    const delivered = ["shipped", "delivered"].includes(order?.status);
+    const restock = delivered && window.confirm("Shop có nhận lại hàng trả về không? OK = nhập lại kho và đảo giá vốn; Cancel = chỉ hoàn tiền.");
+    if (!window.confirm("Xác nhận thực hiện hoàn tiền?")) return;
+    try {
+      await api.post(`/orders/${orderId}/refund/execute`, { restock });
+    } catch (err) {
+      window.alert(err?.response?.data?.message || "Không thực hiện được hoàn tiền");
+    }
+    load();
+  };
   const invoicedOrderIds = new Set(invoices.filter((i) => i.order?._id).map((i) => i.order._id));
   return (
     <section className="space-y-4">
@@ -396,7 +364,7 @@ function AccountingView() {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => requestRefund(order._id)} className="admin-button-secondary">Request refund</button>
-                  <button onClick={() => executeRefund(order._id)} className="admin-button-secondary">Execute refund</button>
+                  <button onClick={() => executeRefund(order._id, order)} className="admin-button-secondary">Execute refund</button>
                 </div>
               </div>
             </div>
@@ -494,33 +462,6 @@ function ApprovalsView() {
   );
 }
 
-function CouponsView() {
-  const [coupons, setCoupons] = React.useState([]);
-  const [form, setForm] = React.useState({ code: "", type: "percent", value: 10, minOrderSubtotal: 0 });
-  const load = React.useCallback(() => api.get("/admin/coupons").then((res) => setCoupons(res.data)).catch(() => setCoupons([])), []);
-  React.useEffect(() => void load(), [load]);
-  const createCoupon = async (e) => { e.preventDefault(); await api.post("/admin/coupons", { ...form, code: String(form.code).trim().toUpperCase(), value: Number(form.value), minOrderSubtotal: Number(form.minOrderSubtotal) }); setForm({ code: "", type: "percent", value: 10, minOrderSubtotal: 0 }); load(); };
-  return (
-    <section className="space-y-4">
-      <PageHeader title="Coupons" description="Quan ly khuyen mai cho storefront." />
-      <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
-        <Panel title="New coupon">
-          <form className="grid gap-3" onSubmit={createCoupon}>
-            <input className="admin-input" value={form.code} onChange={(e) => setForm((p) => ({ ...p, code: e.target.value }))} placeholder="Code" required />
-            <select className="admin-input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}><option value="percent">percent</option><option value="fixed">fixed</option></select>
-            <input className="admin-input" type="number" min="1" value={form.value} onChange={(e) => setForm((p) => ({ ...p, value: e.target.value }))} />
-            <input className="admin-input" type="number" min="0" value={form.minOrderSubtotal} onChange={(e) => setForm((p) => ({ ...p, minOrderSubtotal: e.target.value }))} />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create</button>
-          </form>
-        </Panel>
-        <Panel title="Coupon list">
-          <div className="space-y-2">{coupons.map((coupon) => <div key={coupon._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="font-bold text-white">{coupon.code}</p><p className="text-sm text-zinc-400">{coupon.type} {coupon.value} | used {coupon.usedCount || 0}</p></div>)}</div>
-        </Panel>
-      </div>
-    </section>
-  );
-}
-
 function ReportsView() {
   const [stats, setStats] = React.useState(null);
   const [trialBalance, setTrialBalance] = React.useState(null);
@@ -585,7 +526,8 @@ function SettingsView() {
     username: "",
     email: "",
     phone: "",
-    password: ""
+    password: "",
+    role: "staff"
   });
 
   const loadAdmins = React.useCallback(() => {
@@ -601,7 +543,7 @@ function SettingsView() {
     setMessage("");
     try {
       await api.post("/admin/admins", form);
-      setForm({ name: "", username: "", email: "", phone: "", password: "" });
+      setForm({ name: "", username: "", email: "", phone: "", password: "", role: "staff" });
       setMessage("Tao admin moi thanh cong.");
       loadAdmins();
     } catch (err) {
@@ -631,7 +573,10 @@ function SettingsView() {
             <input className="admin-input" placeholder="Email" type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} required />
             <input className="admin-input" placeholder="Phone" value={form.phone} onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))} />
             <input className="admin-input" placeholder="Password" type="password" value={form.password} onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))} required />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create admin</button>
+            <select className="admin-input" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}>
+              {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </select>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create account</button>
           </form>
           {message ? <p className="mt-2 text-xs text-cyan-300">{message}</p> : null}
         </Panel>
@@ -643,7 +588,7 @@ function SettingsView() {
                   <div>
                     <p className="font-bold text-white">{admin.name} ({admin.username})</p>
                     <p className="text-xs text-zinc-500">{admin.email} | {admin.phone || "-"}</p>
-                    <p className="text-xs text-amber-300">{admin.isBlocked ? "Blocked" : "Active"}</p>
+                    <p className="text-xs text-amber-300">{ROLE_LABELS[admin.role] || admin.role} · {admin.isBlocked ? "Blocked" : "Active"}</p>
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => toggleBlock(admin)} className="admin-button-secondary">

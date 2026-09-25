@@ -289,10 +289,10 @@ export default function AdminUsersPage() {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="Mật khẩu (>=6 ký tự)"
+                placeholder="Mật khẩu (>=8 ký tự, gồm chữ và số)"
                 className={inputClass}
                 required
-                minLength={6}
+                minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,72}" title="8-72 ký tự, gồm chữ và số"
               />
             </>
           )}

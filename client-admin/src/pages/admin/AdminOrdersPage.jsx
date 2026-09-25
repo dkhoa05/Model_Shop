@@ -4,6 +4,14 @@ import { useTheme } from "../../context/ThemeContext.jsx";
 import { api } from "../../services/api.js";
 import { resolvePublicUrl } from "../../utils/publicUrl.js";
 
+/** Khớp state machine phía server */
+const ALLOWED_NEXT = {
+  pending: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: [],
+  cancelled: []
+};
 const STATUSES = ["pending", "processing", "shipped", "delivered", "cancelled"];
 const PAYMENT_LABELS = {
   cod: "COD",
@@ -38,12 +46,20 @@ export default function AdminOrdersPage() {
   }, [user]);
 
   const updateStatus = async (orderId, status) => {
+    if (status === "cancelled" && !window.confirm("Hủy đơn này? Tồn kho sẽ được hoàn lại.")) return;
     try {
-      await api.put(`/orders/${orderId}`, { status });
-      setOrders((prev) => prev.map((o) => (o._id === orderId ? { ...o, status } : o)));
+      const res = await api.put(`/orders/${orderId}`, { status });
+      setOrders((prev) =>
+        prev.map((o) =>
+          o._id === orderId
+            ? { ...o, status: res.data.status, paymentStatus: res.data.paymentStatus, paidAt: res.data.paidAt, couponCode: res.data.couponCode }
+            : o
+        )
+      );
     } catch (err) {
       console.error(err);
-      alert("Lỗi cập nhật trạng thái.");
+      alert(err?.response?.data?.message || "Lỗi cập nhật trạng thái.");
+      fetchOrders();
     }
   };
 
@@ -142,7 +158,7 @@ export default function AdminOrdersPage() {
                     onChange={(e) => updateStatus(o._id, e.target.value)}
                     className={selectClass}
                   >
-                    {STATUSES.map((s) => (
+                    {STATUSES.filter((s) => s === o.status || (ALLOWED_NEXT[o.status] || []).includes(s)).map((s) => (
                       <option key={s} value={s}>
                         {s}
                       </option>

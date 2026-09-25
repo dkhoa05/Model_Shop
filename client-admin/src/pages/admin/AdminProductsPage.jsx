@@ -183,6 +183,7 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState({
     name: "",
     price: "",
+    cost: "",
     stock: "",
     category: "",
     brand: "",
@@ -260,6 +261,7 @@ export default function AdminProductsPage() {
     setForm({
       name: "",
       price: "",
+      cost: "",
       stock: "",
       category: "",
       brand: "",
@@ -347,6 +349,7 @@ export default function AdminProductsPage() {
       const payload = {
         ...form,
         price: Number(form.price),
+        cost: Number(form.cost) || 0,
         stock: stockNum,
         availability: form.availability || "in_stock",
         variantLabel: form.variantLabel?.trim() || "",
@@ -394,6 +397,7 @@ export default function AdminProductsPage() {
     setForm({
       name: p.name || "",
       price: p.price ?? "",
+      cost: p.cost ?? "",
       stock: p.stock != null ? String(p.stock) : "",
       category: p.category || "",
       brand: p.brand || "",
@@ -470,9 +474,19 @@ export default function AdminProductsPage() {
           step="1"
           value={form.price}
           onChange={handleChange}
-          placeholder="Giá (VND)"
+          placeholder="Giá bán (VND)"
           className={inputClass}
           required
+        />
+        <input
+          name="cost"
+          type="number"
+          min="0"
+          step="1"
+          value={form.cost}
+          onChange={handleChange}
+          placeholder="Giá vốn (VND) — dùng tính giá vốn hàng bán"
+          className={inputClass}
         />
         <input
           name="stock"
