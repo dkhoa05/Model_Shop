@@ -4,24 +4,29 @@
   "main": "src/server.js",
   "type": "module",
   "scripts": {
-    "build": "(npm install) && (cd ../client-admin && npm install && npm run build) && (cd ../client-customer && npm install && npm run build)",
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node src/seed.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js",
     "ensure-admin": "node src/ensureAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.22.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.3.3",
-    "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^8.0.5",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^11.3.0",
     "nodemon": "^3.1.0"
   }
 }

@@ -17,6 +17,9 @@
     "build:customer": "npm run build --workspace client-customer",
     "build:admin": "npm run build --workspace client-admin",
     "build": "npm run build:customer && npm run build:admin",
+    "test": "npm test --workspace server",
+    "typecheck": "npm run typecheck --workspace client-customer",
+    "check": "npm run typecheck && npm test && npm run build",
     "start": "node server/src/server.js"
   }
 }
