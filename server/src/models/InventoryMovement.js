@@ -8,7 +8,8 @@ const inventoryMovementSchema = new mongoose.Schema(
       enum: ["in", "out", "adjustment"],
       required: true
     },
-    quantity: { type: Number, required: true, min: 1 },
+    /** in/out: số lượng thay đổi; adjustment: tồn kho mới (>= 0) */
+    quantity: { type: Number, required: true, min: 0 },
     reason: {
       type: String,
       enum: ["purchase", "sale", "return", "damage", "manual"],

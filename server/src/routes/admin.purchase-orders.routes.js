@@ -1,12 +1,14 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isStaff } from "../middlewares/auth.js";
 import { Product } from "../models/Product.js";
 import { Supplier } from "../models/Supplier.js";
 import { PurchaseOrder } from "../models/PurchaseOrder.js";
 import { InventoryMovement } from "../models/InventoryMovement.js";
 import { ApprovalRequest } from "../models/ApprovalRequest.js";
+import { validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
 const PURCHASE_APPROVAL_THRESHOLD = 20000000;
 
 function calcTotal(items = []) {
@@ -18,7 +20,7 @@ function makePoCode() {
   return `PO-${stamp}`;
 }
 
-router.get("/purchase-orders", auth, isAdmin, async (req, res) => {
+router.get("/purchase-orders", auth, isStaff, async (req, res) => {
   try {
     const purchaseOrders = await PurchaseOrder.find()
       .populate("supplier", "name")
@@ -32,7 +34,7 @@ router.get("/purchase-orders", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders", auth, isAdmin, async (req, res) => {
+router.post("/purchase-orders", auth, isStaff, async (req, res) => {
   try {
     const { supplier, items, expectedDate, note } = req.body || {};
     if (!supplier || !Array.isArray(items) || items.length === 0) {
@@ -90,7 +92,7 @@ router.post("/purchase-orders", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.put("/purchase-orders/:id", auth, isAdmin, async (req, res) => {
+router.put("/purchase-orders/:id", auth, isStaff, async (req, res) => {
   try {
     const payload = { ...req.body };
     if (Array.isArray(payload.items)) {
@@ -104,7 +106,7 @@ router.put("/purchase-orders/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders/:id/receive", auth, isAdmin, async (req, res) => {
+router.post("/purchase-orders/:id/receive", auth, isStaff, async (req, res) => {
   try {
     const po = await PurchaseOrder.findById(req.params.id);
     if (!po) return res.status(404).json({ message: "Purchase order not found" });
@@ -124,15 +126,23 @@ router.post("/purchase-orders/:id/receive", auth, isAdmin, async (req, res) => {
       }
     }
 
+    // Đổi trạng thái nguyên tử trước (chặn nhận hàng 2 lần khi bấm đúp / request đồng thời)
+    const claimed = await PurchaseOrder.findOneAndUpdate(
+      { _id: po._id, status: { $nin: ["received", "cancelled"] } },
+      { $set: { status: "received", receivedDate: new Date() } },
+      { new: true }
+    );
+    if (!claimed) return res.status(409).json({ message: "Purchase order already processed" });
+
     for (const item of po.items) {
-      const product = await Product.findById(item.product);
+      const qty = Number(item.quantity || 0);
+      if (!(qty > 0)) continue;
+      const product = await Product.findByIdAndUpdate(item.product, { $inc: { stock: qty } });
       if (!product) continue;
-      product.stock += Number(item.quantity || 0);
-      await product.save();
       await InventoryMovement.create({
         product: product._id,
         type: "in",
-        quantity: Number(item.quantity || 0),
+        quantity: qty,
         reason: "purchase",
         note: `Receive ${po.code}`,
         refType: "purchase_order",
@@ -141,10 +151,7 @@ router.post("/purchase-orders/:id/receive", auth, isAdmin, async (req, res) => {
       });
     }
 
-    po.status = "received";
-    po.receivedDate = new Date();
-    await po.save();
-    return res.json(po);
+    return res.json(claimed);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
   }
