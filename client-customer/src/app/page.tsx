@@ -8,16 +8,19 @@ import Reveal from "@/components/Reveal";
 import SectionTitle from "@/components/SectionTitle";
 import { blogs } from "@/data/blogs";
 import { categories } from "@/data/categories";
-import { getProductsFromApi } from "@/lib/products";
+import { getProductsSafe } from "@/lib/products";
+import { getCheckoutConfigSafe } from "@/lib/checkoutConfig";
+import { formatVND } from "@/utils/currency";
 
-const promoItems = [
-  { title: "Free shipping", text: "Miễn phí vận chuyển cho đơn hàng từ 2.000.000₫.", icon: Truck },
+const buildPromoItems = (freeShipping: number) => [
+  { title: "Free shipping", text: `Miễn phí vận chuyển cho đơn hàng từ ${formatVND(freeShipping)}.`, icon: Truck },
   { title: "Đổi trả rõ ràng", text: "Hỗ trợ đổi sản phẩm lỗi sản xuất trong 7 ngày.", icon: RotateCcw },
   { title: "Chính hãng", text: "Cam kết hàng thật từ Bandai, Kotobukiya, Megahouse.", icon: ShieldCheck }
 ];
 
 export default async function HomePage() {
-  const products = await getProductsFromApi();
+  const [products, checkoutConfig] = await Promise.all([getProductsSafe(), getCheckoutConfigSafe()]);
+  const promoItems = buildPromoItems(checkoutConfig.freeShippingThreshold);
   const featuredProducts = products.filter((product) => product.badge?.type === "hot" || product.status === "limited").slice(0, 5);
   const newArrivals = products.slice(0, 5);
   const bestSellers = [...products].sort((a, b) => b.reviewCount - a.reviewCount).slice(0, 5);

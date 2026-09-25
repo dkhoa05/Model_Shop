@@ -36,7 +36,7 @@ export default function AboutPage() {
         <article className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-6">
           <h2 className="font-space-grotesk text-2xl font-black uppercase text-white">Chính sách mua hàng</h2>
           <ul className="mt-5 grid gap-3 text-sm leading-6 text-zinc-300">
-            <li>Miễn phí vận chuyển cho đơn hàng từ 2.000.000₫.</li>
+            <li>Miễn phí vận chuyển cho đơn hàng đạt ngưỡng ưu đãi (xem chi tiết tại bước thanh toán).</li>
             <li>Đổi trả trong 7 ngày nếu sản phẩm lỗi sản xuất hoặc giao sai mẫu.</li>
             <li>Hỗ trợ kiểm tra tồn kho và giữ slot pre-order theo lịch release.</li>
           </ul>

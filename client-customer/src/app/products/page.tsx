@@ -37,7 +37,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-        <ProductFilter activeParams={searchParams} />
+        <ProductFilter activeParams={searchParams} brands={Array.from(new Set(products.map((p) => p.brand))).sort()} />
         <div className="space-y-6">
           <ProductGrid products={filteredProducts} />
           {filteredProducts.length > 0 && (

@@ -5,7 +5,7 @@ import { SlidersHorizontal, X } from "lucide-react";
 import { useState } from "react";
 import { getParamList, priceRanges, productFilterGroups, ProductSearchParams } from "@/lib/products";
 
-export default function ProductFilter({ activeParams }: { activeParams: ProductSearchParams }) {
+export default function ProductFilter({ activeParams, brands = [] }: { activeParams: ProductSearchParams; brands?: string[] }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -16,7 +16,7 @@ export default function ProductFilter({ activeParams }: { activeParams: ProductS
       </button>
 
       <aside className="hidden rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 lg:sticky lg:top-24 lg:block">
-        <FilterContent activeParams={activeParams} />
+        <FilterContent activeParams={activeParams} brands={brands} />
       </aside>
 
       {open && (
@@ -32,7 +32,7 @@ export default function ProductFilter({ activeParams }: { activeParams: ProductS
                 <X size={20} />
               </button>
             </div>
-            <FilterContent activeParams={activeParams} onSelect={() => setOpen(false)} hideTitle />
+            <FilterContent activeParams={activeParams} brands={brands} onSelect={() => setOpen(false)} hideTitle />
           </aside>
         </div>
       )}
@@ -40,7 +40,12 @@ export default function ProductFilter({ activeParams }: { activeParams: ProductS
   );
 }
 
-function FilterContent({ activeParams, onSelect, hideTitle = false }: { activeParams: ProductSearchParams; onSelect?: () => void; hideTitle?: boolean }) {
+function FilterContent({ activeParams, brands, onSelect, hideTitle = false }: { activeParams: ProductSearchParams; brands: string[]; onSelect?: () => void; hideTitle?: boolean }) {
+  const groups = [
+    ...productFilterGroups.slice(0, 1),
+    ...(brands.length ? [{ title: "Brand", key: "brand", values: brands }] : []),
+    ...productFilterGroups.slice(1)
+  ] as Array<{ title: string; key: string; values: readonly string[] }>;
   return (
     <>
       {!hideTitle && (
@@ -56,7 +61,7 @@ function FilterContent({ activeParams, onSelect, hideTitle = false }: { activePa
       )}
 
       <div className="space-y-6">
-        {productFilterGroups.map((group) => (
+        {groups.map((group) => (
           <section key={group.title}>
             <h3 className="mb-3 text-xs font-black uppercase tracking-wide text-zinc-400">{group.title}</h3>
             <div className="grid gap-2">

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Bot, Heart, Minus, PackageCheck, Plus, ShieldCheck, ShoppingBag, Star, Truck } from "lucide-react";
-import { Product } from "@/data/products";
+import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
 import { formatVND } from "@/utils/currency";
 import Badge from "./Badge";

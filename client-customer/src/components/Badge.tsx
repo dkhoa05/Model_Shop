@@ -1,4 +1,4 @@
-import { BadgeType } from "@/data/products";
+import { BadgeType } from "@/types/product";
 
 const badgeStyles: Record<BadgeType, string> = {
   new: "bg-emerald-400 text-zinc-950",

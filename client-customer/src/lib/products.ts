@@ -1,4 +1,4 @@
-import { products, Product, ProductStatus } from "@/data/products";
+import { Product, ProductStatus } from "@/types/product";
 
 export type ProductSearchParams = Record<string, string | string[] | undefined>;
 export type ApiProduct = {
@@ -34,11 +34,6 @@ export const productFilterGroups = [
     values: ["Gundam HG", "Gundam MG", "Gundam RG", "Gundam PG", "Figure Anime", "Tools & Accessories"]
   },
   {
-    title: "Brand",
-    key: "brand",
-    values: Array.from(new Set(products.map((product) => product.brand)))
-  },
-  {
     title: "Grade",
     key: "grade",
     values: ["HG", "RG", "MG", "PG", "MGEX"]
@@ -64,22 +59,6 @@ export function getParam(searchParams: ProductSearchParams, key: string): string
 export function getParamList(searchParams: ProductSearchParams, key: string): string[] {
   const value = getParam(searchParams, key);
   return value ? value.split(",").filter(Boolean) : [];
-}
-
-export function searchProducts(query: string, limit = 4): Product[] {
-  const normalized = query.trim().toLowerCase();
-
-  if (!normalized) {
-    return [];
-  }
-
-  return products
-    .filter((product) => searchableText(product).includes(normalized))
-    .slice(0, limit);
-}
-
-export function getFilteredProducts(searchParams: ProductSearchParams): Product[] {
-  return getFilteredProductsFromList(products, searchParams);
 }
 
 export function getFilteredProductsFromList(productList: Product[], searchParams: ProductSearchParams): Product[] {
@@ -140,25 +119,37 @@ export function sortProducts(productList: Product[], sort: string): Product[] {
   });
 }
 
-export function getProductBySlug(slug: string): Product | undefined {
-  return products.find((product) => product.slug === slug);
+/** Catalog chỉ lấy từ API/DB. Lỗi → throw để trang hiển thị error boundary (không dùng dữ liệu giả). */
+export async function getProductsFromApi(): Promise<Product[]> {
+  const response = await fetch(`${API_BASE_URL}/api/products`, {
+    next: { revalidate: 30 }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Products API failed: ${response.status}`);
+  }
+
+  const rawProducts = (await response.json()) as ApiProduct[];
+  return rawProducts.map(mapApiProduct);
 }
 
-export async function getProductsFromApi(): Promise<Product[]> {
+/** Dùng cho thành phần không thiết yếu (trang chủ, generateStaticParams…): lỗi API → danh sách rỗng */
+export async function getProductsSafe(): Promise<Product[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/products`, {
-      next: { revalidate: 30 }
-    });
-
-    if (!response.ok) {
-      throw new Error(`Products API failed: ${response.status}`);
-    }
-
-    const rawProducts = (await response.json()) as ApiProduct[];
-    return rawProducts.map(mapApiProduct);
-  } catch {
-    return products;
+    return await getProductsFromApi();
+  } catch (error) {
+    console.error("[products]", error);
+    return [];
   }
+}
+
+/** Tìm kiếm gợi ý (client) qua API */
+export async function searchProductsFromApi(query: string, limit = 4, signal?: AbortSignal): Promise<Product[]> {
+  const q = query.trim();
+  if (!q) return [];
+  const response = await fetch(`${API_BASE_URL}/api/products?search=${encodeURIComponent(q)}&limit=${limit}`, { signal });
+  if (!response.ok) return [];
+  return ((await response.json()) as ApiProduct[]).map(mapApiProduct);
 }
 
 export async function getProductBySlugFromApi(slug: string): Promise<Product | undefined> {
@@ -173,22 +164,9 @@ export async function getProductsByIdsFromApi(ids: string[]): Promise<Product[]>
     .filter(Boolean) as Product[];
 }
 
-export function getRelatedProducts(product: Product, limit = 4): Product[] {
-  const sameCategory = products.filter((item) => item.id !== product.id && item.category === product.category);
-  return (sameCategory.length ? sameCategory : products.filter((item) => item.id !== product.id)).slice(0, limit);
-}
-
 export function getRelatedProductsFromList(productList: Product[], product: Product, limit = 4): Product[] {
   const sameCategory = productList.filter((item) => item.id !== product.id && item.category === product.category);
   return (sameCategory.length ? sameCategory : productList.filter((item) => item.id !== product.id)).slice(0, limit);
-}
-
-export function getRecentlyViewedProducts(currentProductId: string, limit = 4): Product[] {
-  return products.filter((product) => product.id !== currentProductId).slice(0, limit);
-}
-
-export function getRecentlyViewedProductsFromList(productList: Product[], currentProductId: string, limit = 4): Product[] {
-  return productList.filter((product) => product.id !== currentProductId).slice(0, limit);
 }
 
 function searchableText(product: Product): string {
@@ -201,7 +179,7 @@ function searchableText(product: Product): string {
 export function mapApiProduct(product: ApiProduct): Product {
   const status = mapAvailability(product.availability, product.stock || 0);
   const grade = inferGrade(product.name, product.variantLabel, product.category);
-  const slug = slugify(product.name);
+  const slug = `${slugify(product.name)}-${product._id.slice(-6)}`;
   const images = normalizeImages(product.images || []);
 
   return {

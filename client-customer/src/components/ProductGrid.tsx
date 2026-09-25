@@ -1,4 +1,4 @@
-import { Product } from "@/data/products";
+import { Product } from "@/types/product";
 import EmptyState from "./EmptyState";
 import ProductCard from "./ProductCard";
 
