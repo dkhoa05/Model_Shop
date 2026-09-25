@@ -1,11 +1,14 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isFinance } from "../middlewares/auth.js";
 import { Expense } from "../models/Expense.js";
 import { parseOptionalDayBounds } from "../utils/dateRangeQuery.js";
+import { validateObjectId } from "../utils/validate.js";
+import { removeExpenseJournal, syncExpenseJournal } from "../services/accounting.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
 
-router.get("/expenses", auth, isAdmin, async (req, res) => {
+router.get("/expenses", auth, isFinance, async (req, res) => {
   try {
     const { from, to } = parseOptionalDayBounds(req.query.from, req.query.to);
     const match = {};
@@ -19,7 +22,7 @@ router.get("/expenses", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/expenses", auth, isAdmin, async (req, res) => {
+router.post("/expenses", auth, isFinance, async (req, res) => {
   try {
     const { title, amount, category, note, expenseDate } = req.body || {};
     if (!title || typeof title !== "string") return res.status(400).json({ message: "Tiêu đề là bắt buộc" });
@@ -35,13 +38,14 @@ router.post("/expenses", auth, isAdmin, async (req, res) => {
       note: note ? String(note).trim() : "",
       expenseDate: d
     });
+    await syncExpenseJournal(item, req.user?._id);
     return res.status(201).json(item);
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }
 });
 
-router.put("/expenses/:id", auth, isAdmin, async (req, res) => {
+router.put("/expenses/:id", auth, isFinance, async (req, res) => {
   try {
     const { title, amount, category, note, expenseDate } = req.body || {};
     const update = {};
@@ -60,16 +64,18 @@ router.put("/expenses/:id", auth, isAdmin, async (req, res) => {
 
     const item = await Expense.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!item) return res.status(404).json({ message: "Không tìm thấy khoản chi" });
+    await syncExpenseJournal(item, req.user?._id);
     return res.json(item);
   } catch (err) {
     return res.status(500).json({ message: "Server error" });
   }
 });
 
-router.delete("/expenses/:id", auth, isAdmin, async (req, res) => {
+router.delete("/expenses/:id", auth, isFinance, async (req, res) => {
   try {
     const item = await Expense.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ message: "Không tìm thấy khoản chi" });
+    await removeExpenseJournal(item._id);
     return res.json({ message: "Đã xóa" });
   } catch (err) {
     return res.status(500).json({ message: "Server error" });

@@ -1,87 +1,26 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isFinance } from "../middlewares/auth.js";
 import { Invoice } from "../models/Invoice.js";
 import { Order } from "../models/Order.js";
+import { Expense } from "../models/Expense.js";
 import { Account } from "../models/Account.js";
 import { JournalEntry } from "../models/JournalEntry.js";
+import {
+  ensureDefaultAccounts,
+  makeInvoiceCode,
+  postInvoiceJournal,
+  postPaymentJournal,
+  postInvoiceVoidJournal,
+  syncOrderAccounting,
+  syncExpenseJournal
+} from "../services/accounting.js";
+import { validateObjectId } from "../utils/validate.js";
 
 const router = express.Router();
+router.param("id", validateObjectId);
+router.param("orderId", validateObjectId);
 
-function makeInvoiceCode() {
-  const stamp = Date.now().toString().slice(-8);
-  return `INV-${stamp}`;
-}
-
-const defaultAccounts = [
-  { code: "111", name: "Cash", type: "asset" },
-  { code: "131", name: "Accounts Receivable", type: "asset" },
-  { code: "156", name: "Inventory", type: "asset" },
-  { code: "331", name: "Accounts Payable", type: "liability" },
-  { code: "511", name: "Sales Revenue", type: "revenue" },
-  { code: "632", name: "COGS", type: "expense" }
-];
-
-async function ensureDefaultAccounts() {
-  for (const row of defaultAccounts) {
-    await Account.findOneAndUpdate({ code: row.code }, row, { upsert: true, new: true, setDefaultsOnInsert: true });
-  }
-}
-
-async function getAccountByCode(code) {
-  return Account.findOne({ code, active: true });
-}
-
-async function postInvoiceJournal(invoice, userId) {
-  const existing = await JournalEntry.findOne({ refType: "invoice", refId: String(invoice._id) });
-  if (existing) return existing;
-
-  await ensureDefaultAccounts();
-  const receivable = await getAccountByCode("131");
-  const revenue = await getAccountByCode("511");
-  if (!receivable || !revenue) {
-    throw new Error("Missing accounting accounts");
-  }
-
-  const amount = Number(invoice.totalAmount || 0);
-  return JournalEntry.create({
-    date: invoice.createdAt || new Date(),
-    refType: "invoice",
-    refId: String(invoice._id),
-    description: `Post invoice ${invoice.code}`,
-    lines: [
-      { account: receivable._id, debit: amount, credit: 0, memo: "Customer receivable" },
-      { account: revenue._id, debit: 0, credit: amount, memo: "Sales revenue" }
-    ],
-    postedBy: userId || null
-  });
-}
-
-async function postPaymentJournal(invoice, userId) {
-  const existing = await JournalEntry.findOne({ refType: "invoice_payment", refId: String(invoice._id) });
-  if (existing) return existing;
-
-  await ensureDefaultAccounts();
-  const cash = await getAccountByCode("111");
-  const receivable = await getAccountByCode("131");
-  if (!cash || !receivable) {
-    throw new Error("Missing accounting accounts");
-  }
-
-  const amount = Number(invoice.totalAmount || 0);
-  return JournalEntry.create({
-    date: invoice.paidAt || new Date(),
-    refType: "invoice_payment",
-    refId: String(invoice._id),
-    description: `Receive payment ${invoice.code}`,
-    lines: [
-      { account: cash._id, debit: amount, credit: 0, memo: "Cash in" },
-      { account: receivable._id, debit: 0, credit: amount, memo: "Close receivable" }
-    ],
-    postedBy: userId || null
-  });
-}
-
-router.get("/accounts", auth, isAdmin, async (req, res) => {
+router.get("/accounts", auth, isFinance, async (req, res) => {
   try {
     await ensureDefaultAccounts();
     const accounts = await Account.find().sort({ code: 1 }).lean();
@@ -91,16 +30,20 @@ router.get("/accounts", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/accounts", auth, isAdmin, async (req, res) => {
+router.post("/accounts", auth, isFinance, async (req, res) => {
   try {
-    const account = await Account.create(req.body || {});
+    const { code, name, type } = req.body || {};
+    if (!code || !name || !["asset", "liability", "equity", "revenue", "expense"].includes(type)) {
+      return res.status(400).json({ message: "code, name và type hợp lệ là bắt buộc" });
+    }
+    const account = await Account.create({ code: String(code).trim(), name: String(name).trim(), type });
     return res.status(201).json(account);
   } catch (error) {
     return res.status(400).json({ message: "Invalid account payload" });
   }
 });
 
-router.get("/journal-entries", auth, isAdmin, async (req, res) => {
+router.get("/journal-entries", auth, isFinance, async (req, res) => {
   try {
     const entries = await JournalEntry.find()
       .populate("lines.account", "code name type")
@@ -113,7 +56,7 @@ router.get("/journal-entries", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get("/invoices", auth, isAdmin, async (req, res) => {
+router.get("/invoices", auth, isFinance, async (req, res) => {
   try {
     const invoices = await Invoice.find().populate("order", "paymentRef status totalPrice").sort({ createdAt: -1 }).lean();
     return res.json(invoices);
@@ -122,7 +65,7 @@ router.get("/invoices", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.post("/invoices/from-order/:orderId", auth, isAdmin, async (req, res) => {
+router.post("/invoices/from-order/:orderId", auth, isFinance, async (req, res) => {
   try {
     const order = await Order.findById(req.params.orderId).populate("user", "name email");
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -153,44 +96,100 @@ router.post("/invoices/from-order/:orderId", auth, isAdmin, async (req, res) => 
   }
 });
 
-router.post("/invoices", auth, isAdmin, async (req, res) => {
+router.post("/invoices", auth, isFinance, async (req, res) => {
   try {
-    const payload = req.body || {};
+    const b = req.body || {};
+    const customerName = typeof b.customerName === "string" ? b.customerName.trim() : "";
+    if (!customerName) return res.status(400).json({ message: "customerName is required" });
+    const subtotal = Number(b.subtotal || 0);
+    const taxAmount = Number(b.taxAmount || 0);
+    if (![subtotal, taxAmount].every((n) => Number.isFinite(n) && n >= 0)) {
+      return res.status(400).json({ message: "Invalid amounts" });
+    }
+    const status = b.status === "posted" ? "posted" : "draft"; // thu tiền phải làm qua bước "paid" riêng
     const invoice = await Invoice.create({
-      ...payload,
-      code: payload.code || makeInvoiceCode(),
+      code: makeInvoiceCode(),
+      customerName,
+      customerEmail: typeof b.customerEmail === "string" ? b.customerEmail.trim() : "",
+      subtotal,
+      taxAmount,
+      totalAmount: subtotal + taxAmount,
+      status,
+      dueDate: b.dueDate ? new Date(b.dueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      note: typeof b.note === "string" ? b.note.slice(0, 500) : "",
       createdBy: req.user?._id || null
     });
-    if (invoice.status === "posted" || invoice.status === "paid") {
-      await postInvoiceJournal(invoice, req.user?._id);
-    }
-    if (invoice.status === "paid") {
-      invoice.paidAt = invoice.paidAt || new Date();
-      await invoice.save();
-      await postPaymentJournal(invoice, req.user?._id);
-    }
+    if (status === "posted") await postInvoiceJournal(invoice, req.user?._id);
     return res.status(201).json(invoice);
   } catch (error) {
     return res.status(400).json({ message: "Invalid invoice payload" });
   }
 });
 
-router.put("/invoices/:id", auth, isAdmin, async (req, res) => {
+/** Chuyển trạng thái hóa đơn: draft→posted→paid; draft/posted→cancelled (posted có bút toán đảo) */
+router.put("/invoices/:id", auth, isFinance, async (req, res) => {
   try {
-    const payload = { ...req.body };
-    if (payload.status === "paid") payload.paidAt = new Date();
-    const invoice = await Invoice.findByIdAndUpdate(req.params.id, payload, { new: true });
+    const b = req.body || {};
+    const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Invoice not found" });
 
-    if (invoice.status === "posted" || invoice.status === "paid") {
-      await postInvoiceJournal(invoice, req.user?._id);
-    }
-    if (invoice.status === "paid") {
-      await postPaymentJournal(invoice, req.user?._id);
+    if (typeof b.note === "string") invoice.note = b.note.slice(0, 500);
+    if (b.dueDate) invoice.dueDate = new Date(b.dueDate);
+
+    const next = b.status;
+    if (next && next !== invoice.status) {
+      const allowed = { draft: ["posted", "cancelled"], posted: ["paid", "cancelled"], paid: [], cancelled: [] };
+      if (!(allowed[invoice.status] || []).includes(next)) {
+        return res.status(400).json({ message: `Không thể chuyển hóa đơn từ ${invoice.status} sang ${next}` });
+      }
+      const wasPosted = invoice.status === "posted";
+      invoice.status = next;
+      if (next === "paid") invoice.paidAt = new Date();
+      await invoice.save();
+      if (next === "posted") await postInvoiceJournal(invoice, req.user?._id);
+      if (next === "paid") {
+        await postInvoiceJournal(invoice, req.user?._id);
+        await postPaymentJournal(invoice, req.user?._id);
+      }
+      if (next === "cancelled" && wasPosted) await postInvoiceVoidJournal(invoice, req.user?._id);
+    } else {
+      await invoice.save();
     }
     return res.json(invoice);
   } catch (error) {
     return res.status(400).json({ message: "Invalid invoice payload" });
+  }
+});
+
+/** Đối soát: ghi sổ bổ sung cho các đơn đã giao chưa có hóa đơn/bút toán (idempotent) */
+router.post("/accounting/reconcile", auth, isFinance, async (req, res) => {
+  try {
+    const orders = await Order.find({ status: "delivered" }).select("_id").sort({ createdAt: -1 }).limit(1000).lean();
+    let processed = 0;
+    let failed = 0;
+    for (const o of orders) {
+      try {
+        await syncOrderAccounting(o._id, req.user?._id);
+        processed += 1;
+      } catch (err) {
+        failed += 1;
+        console.error("[accounting] reconcile failed", String(o._id), err.message);
+      }
+    }
+    const expenses = await Expense.find().lean();
+    let expensesPosted = 0;
+    for (const e of expenses) {
+      try {
+        await syncExpenseJournal(e, req.user?._id);
+        expensesPosted += 1;
+      } catch (err) {
+        failed += 1;
+        console.error("[accounting] expense reconcile failed", String(e._id), err.message);
+      }
+    }
+    return res.json({ processed, expensesPosted, failed });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
   }
 });
 

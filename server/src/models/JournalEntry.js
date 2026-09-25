@@ -23,5 +23,10 @@ const journalEntrySchema = new mongoose.Schema(
 );
 
 journalEntrySchema.index({ date: -1 });
+/** Mỗi chứng từ nguồn chỉ có một bút toán cho mỗi loại (chống ghi sổ trùng) */
+journalEntrySchema.index(
+  { refType: 1, refId: 1 },
+  { unique: true, partialFilterExpression: { refType: { $gt: "" }, refId: { $gt: "" } } }
+);
 
 export const JournalEntry = mongoose.model("JournalEntry", journalEntrySchema);

@@ -1,5 +1,5 @@
 import express from "express";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isFinance } from "../middlewares/auth.js";
 import { Order } from "../models/Order.js";
 import { Expense } from "../models/Expense.js";
 import { JournalEntry } from "../models/JournalEntry.js";
@@ -120,7 +120,7 @@ function buildProjectStage(period) {
  * - to: ISO date (optional)
  * - status: order status filter (default delivered)
  */
-router.get("/reports/revenue", auth, isAdmin, async (req, res) => {
+router.get("/reports/revenue", auth, isFinance, async (req, res) => {
   try {
     const period = ["day", "week", "month", "year"].includes(String(req.query.period))
       ? String(req.query.period)
@@ -141,7 +141,7 @@ router.get("/reports/revenue", auth, isAdmin, async (req, res) => {
       {
         $group: {
           ...buildGroupStage(period),
-          revenue: { $sum: "$totalPrice" },
+          revenue: { $sum: { $cond: [{ $eq: ["$refundStatus", "refunded"] }, { $subtract: ["$totalPrice", "$refundAmount"] }, "$totalPrice"] } },
           orders: { $sum: 1 }
         }
       },
@@ -179,7 +179,7 @@ router.get("/reports/revenue", auth, isAdmin, async (req, res) => {
  * - to: ISO date (optional)
  * - status: order status filter for revenue (default delivered)
  */
-router.get("/reports/profit", auth, isAdmin, async (req, res) => {
+router.get("/reports/profit", auth, isFinance, async (req, res) => {
   try {
     const period = ["day", "week", "month", "year"].includes(String(req.query.period))
       ? String(req.query.period)
@@ -199,7 +199,8 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
         {
           $group: {
             ...buildGroupStage(period),
-            revenue: { $sum: "$totalPrice" },
+            revenue: { $sum: { $cond: [{ $eq: ["$refundStatus", "refunded"] }, { $subtract: ["$totalPrice", "$refundAmount"] }, "$totalPrice"] } },
+            cogs: { $sum: { $ifNull: ["$cogsAmount", 0] } },
             orders: { $sum: 1 }
           }
         },
@@ -254,10 +255,10 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
 
     const byLabel = new Map();
     for (const r of revSeries) {
-      byLabel.set(r.label, { label: r.label, revenue: r.revenue || 0, orders: r.orders || 0, expense: 0 });
+      byLabel.set(r.label, { label: r.label, revenue: r.revenue || 0, cogs: r.cogs || 0, orders: r.orders || 0, expense: 0 });
     }
     for (const e of expSeries) {
-      const cur = byLabel.get(e.label) || { label: e.label, revenue: 0, orders: 0, expense: 0 };
+      const cur = byLabel.get(e.label) || { label: e.label, revenue: 0, cogs: 0, orders: 0, expense: 0 };
       cur.expense = Number(e.expense || 0);
       byLabel.set(e.label, cur);
     }
@@ -265,21 +266,22 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
     const totals = series.reduce(
       (acc, x) => {
         acc.revenue += Number(x.revenue || 0);
+        acc.cogs += Number(x.cogs || 0);
         acc.expense += Number(x.expense || 0);
         acc.orders += Number(x.orders || 0);
         return acc;
       },
-      { revenue: 0, expense: 0, orders: 0 }
+      { revenue: 0, cogs: 0, expense: 0, orders: 0 }
     );
     totals.expense = Number(expenseTotalAgg[0]?.total || 0);
-    totals.profit = totals.revenue - totals.expense;
+    totals.profit = totals.revenue - totals.cogs - totals.expense;
 
     return res.json({
       period,
       status,
       range: { from, to },
       totals,
-      series: series.map((x) => ({ ...x, profit: Number(x.revenue || 0) - Number(x.expense || 0) }))
+      series: series.map((x) => ({ ...x, profit: Number(x.revenue || 0) - Number(x.cogs || 0) - Number(x.expense || 0) }))
     });
   } catch (err) {
     console.error(err);
@@ -287,7 +289,7 @@ router.get("/reports/profit", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get("/reports/trial-balance", auth, isAdmin, async (req, res) => {
+router.get("/reports/trial-balance", auth, isFinance, async (req, res) => {
   try {
     const { from, to } = resolveReportBounds(req.query.from, req.query.to, "month");
     const match = { date: { $gte: from, $lte: to } };
@@ -329,7 +331,7 @@ router.get("/reports/trial-balance", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get("/reports/pnl", auth, isAdmin, async (req, res) => {
+router.get("/reports/pnl", auth, isFinance, async (req, res) => {
   try {
     const { from, to } = resolveReportBounds(req.query.from, req.query.to, "month");
     const match = { date: { $gte: from, $lte: to } };
@@ -371,7 +373,7 @@ router.get("/reports/pnl", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get("/reports/ar-aging", auth, isAdmin, async (req, res) => {
+router.get("/reports/ar-aging", auth, isFinance, async (req, res) => {
   try {
     const now = new Date();
     const invoices = await Invoice.find({
@@ -418,20 +420,34 @@ router.get("/reports/ar-aging", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.get("/reports/finance-kpis", auth, isAdmin, async (req, res) => {
+router.get("/reports/finance-kpis", auth, isFinance, async (req, res) => {
   try {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    const deliveredRevenueAgg = await Order.aggregate([
-      { $match: { status: "delivered", createdAt: { $gte: monthStart, $lte: monthEnd } } },
-      { $group: { _id: null, revenue: { $sum: "$totalPrice" }, orders: { $sum: 1 } } }
+    // Số liệu lấy từ sổ nhật ký (nguồn sự thật kế toán): doanh thu thuần, giá vốn, chi phí hoạt động
+    const grouped = await JournalEntry.aggregate([
+      { $match: { date: { $gte: monthStart, $lte: monthEnd } } },
+      { $unwind: "$lines" },
+      { $group: { _id: "$lines.account", debit: { $sum: "$lines.debit" }, credit: { $sum: "$lines.credit" } } }
     ]);
-    const expenseAgg = await Expense.aggregate([
-      { $match: { expenseDate: { $gte: monthStart, $lte: monthEnd } } },
-      { $group: { _id: null, expense: { $sum: "$amount" } } }
-    ]);
+    const accounts = await Account.find({ _id: { $in: grouped.map((x) => x._id) } }).lean();
+    const byId = new Map(accounts.map((a) => [String(a._id), a]));
+    let revenue = 0;
+    let cogs = 0;
+    let operatingExpense = 0;
+    for (const row of grouped) {
+      const acc = byId.get(String(row._id));
+      if (!acc) continue;
+      const dr = Number(row.debit || 0);
+      const cr = Number(row.credit || 0);
+      if (acc.type === "revenue") revenue += cr - dr;
+      else if (acc.code === "632") cogs += dr - cr;
+      else if (acc.type === "expense") operatingExpense += dr - cr;
+    }
+
+    const deliveredOrders = await Order.countDocuments({ status: "delivered", createdAt: { $gte: monthStart, $lte: monthEnd } });
     const refundAgg = await Order.aggregate([
       { $match: { refundStatus: "refunded", refundedAt: { $gte: monthStart, $lte: monthEnd } } },
       { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: "$refundAmount" } } }
@@ -441,29 +457,26 @@ router.get("/reports/finance-kpis", auth, isAdmin, async (req, res) => {
       { $group: { _id: null, total: { $sum: "$totalAmount" } } }
     ]);
 
-    const revenue = Number(deliveredRevenueAgg[0]?.revenue || 0);
-    const deliveredOrders = Number(deliveredRevenueAgg[0]?.orders || 0);
-    const operatingExpense = Number(expenseAgg[0]?.expense || 0);
     const refundCount = Number(refundAgg[0]?.count || 0);
     const refundAmount = Number(refundAgg[0]?.amount || 0);
     const arOutstanding = Number(arAgg[0]?.total || 0);
-    const grossProfit = revenue - operatingExpense;
-    const refundRate = deliveredOrders > 0 ? refundCount / deliveredOrders : 0;
-    const grossMargin = revenue > 0 ? grossProfit / revenue : 0;
-    const arTurnover = arOutstanding > 0 ? revenue / arOutstanding : 0;
+    const grossProfit = revenue - cogs;
+    const netProfit = grossProfit - operatingExpense;
 
     return res.json({
       period: { from: monthStart, to: monthEnd },
       totals: {
         revenue,
+        cogs,
         operatingExpense,
         grossProfit,
-        grossMargin,
+        netProfit,
+        grossMargin: revenue > 0 ? grossProfit / revenue : 0,
         refundCount,
         refundAmount,
-        refundRate,
+        refundRate: deliveredOrders > 0 ? refundCount / deliveredOrders : 0,
         arOutstanding,
-        arTurnover
+        arTurnover: arOutstanding > 0 ? revenue / arOutstanding : 0
       }
     });
   } catch (err) {
@@ -473,4 +486,3 @@ router.get("/reports/finance-kpis", auth, isAdmin, async (req, res) => {
 });
 
 export default router;
-
