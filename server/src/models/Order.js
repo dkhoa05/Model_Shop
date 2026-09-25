@@ -14,6 +14,8 @@ const orderSchema = new mongoose.Schema(
     /** null = đặt hàng không đăng nhập (khách vãng lai) */
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     recipientName: { type: String, trim: true, default: "" },
+    /** Ghi chú của khách khi đặt hàng */
+    customerNote: { type: String, trim: true, default: "" },
     guestEmail: { type: String, trim: true, default: "" },
     addressProvince: { type: String, trim: true, default: "" },
     addressDistrict: { type: String, trim: true, default: "" },
@@ -26,6 +28,8 @@ const orderSchema = new mongoose.Schema(
     shippingFee: { type: Number, default: 0, min: 0 },
     discountAmount: { type: Number, default: 0, min: 0 },
     couponCode: { type: String, trim: true, default: "" },
+    /** Mã đã hoàn lại khi hủy đơn (giải phóng để user dùng lại) */
+    releasedCouponCode: { type: String, trim: true, default: "" },
     deliveryType: {
       type: String,
       enum: ["pickup", "delivery"],
@@ -47,7 +51,9 @@ const orderSchema = new mongoose.Schema(
       required: true
     },
     paidAt: { type: Date },
-    paymentRef: { type: String, trim: true },
+    paymentRef: { type: String, trim: true, unique: true, sparse: true },
+    /** Khách vãng lai dùng token này (kèm mã đơn) để tra cứu/hủy/gửi minh chứng; chỉ trả về 1 lần lúc đặt */
+    accessToken: { type: String, select: false, index: true, sparse: true },
     paymentProofUrl: { type: String, trim: true },
     paymentProofSubmittedAt: { type: Date },
     refundStatus: {
@@ -56,6 +62,9 @@ const orderSchema = new mongoose.Schema(
       default: "none"
     },
     refundAmount: { type: Number, min: 0, default: 0 },
+    refundReason: { type: String, trim: true, default: "" },
+    /** Giá vốn đã ghi sổ khi giao hàng (để đảo bút toán khi nhận hàng trả) */
+    cogsAmount: { type: Number, min: 0, default: 0 },
     refundApprovalRequest: { type: mongoose.Schema.Types.ObjectId, ref: "ApprovalRequest", default: null },
     refundedAt: { type: Date, default: null },
     status: {

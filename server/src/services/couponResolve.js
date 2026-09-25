@@ -1,7 +1,6 @@
 import mongoose from "mongoose";
 import { Coupon } from "../models/Coupon.js";
 import { Order } from "../models/Order.js";
-import { applyCoupon as applyLegacyCoupon } from "../constants/checkout.js";
 
 /** Đã có đơn (cùng user) áp mã này chưa — so sánh mã không phân biệt hoa thường */
 async function userAlreadyUsedCoupon(userId, normalizedCode) {
@@ -136,18 +135,6 @@ export async function resolveCouponDiscount(code, fullSubtotal, lineItems = null
     return { discount, normalizedCode: doc.code, coupon: doc };
   }
 
-  const legacy = applyLegacyCoupon(code, full);
-  if (legacy.normalizedCode) {
-    if (await userAlreadyUsedCoupon(userId, legacy.normalizedCode)) {
-      return {
-        discount: 0,
-        normalizedCode: "",
-        coupon: null,
-        error: "Bạn đã sử dụng mã này rồi — mỗi tài khoản chỉ áp dụng một lần."
-      };
-    }
-    return { discount: legacy.discount, normalizedCode: legacy.normalizedCode, coupon: null };
-  }
   return {
     discount: 0,
     normalizedCode: "",

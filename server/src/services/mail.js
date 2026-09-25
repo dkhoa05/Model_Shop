@@ -321,3 +321,54 @@ export async function sendOrderCancelledEmail({ to, recipientName, order }) {
     return { sent: false, reason: "send_failed" };
   }
 }
+
+/**
+ * Email xác nhận đặt hàng (kèm link xem/tra cứu đơn — khách vãng lai dùng link có token).
+ * @returns {Promise<{ sent: boolean, reason?: string }>}
+ */
+export async function sendOrderPlacedEmail({ to, recipientName, order, trackingUrl }) {
+  const cfg = getMailConfig();
+  if (!cfg) {
+    console.warn("[mail] Thiếu SMTP — bỏ qua email xác nhận đặt hàng.");
+    return { sent: false, reason: "not_configured" };
+  }
+  if (!to || typeof to !== "string" || !to.trim()) {
+    return { sent: false, reason: "no_email" };
+  }
+
+  const ref = order.paymentRef || String(order._id);
+  const safeName = recipientName ? escapeHtml(recipientName) : "";
+  const subject = `Model Shop — Đã nhận đơn hàng ${ref}`;
+  const link = trackingUrl ? escapeHtml(trackingUrl) : "";
+  const needsPayment = order.paymentMethod && order.paymentMethod !== "cod";
+  const html = `<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="utf-8"></head>
+<body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.6;color:#1e293b;background:#f8fafc;padding:24px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(15,23,42,.08);overflow:hidden;">
+    <tr><td style="padding:28px 24px;">
+      <p style="margin:0 0 16px;font-size:16px;">Xin chào${safeName ? ` <strong>${safeName}</strong>` : ""},</p>
+      <p style="margin:0 0 16px;">Model Shop đã nhận đơn hàng <strong>${escapeHtml(ref)}</strong> của bạn.${needsPayment ? " Vui lòng chuyển khoản theo hướng dẫn trên trang đơn hàng và tải ảnh minh chứng để shop xác nhận." : ""}</p>
+      ${orderSummaryBlock(order, ref)}
+      ${link ? `<p style="margin:16px 0;"><a href="${link}" style="display:inline-block;background:#dc2626;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;">Xem / theo dõi đơn hàng</a></p><p style="margin:0;font-size:12px;color:#64748b;">Hãy giữ email này để tra cứu đơn khi cần.</p>` : ""}
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const text = [
+    `Xin chào${recipientName ? ` ${recipientName}` : ""},`,
+    "",
+    `Model Shop đã nhận đơn ${ref}. Tổng: ${formatVnd(order.totalPrice)}`,
+    trackingUrl ? `Theo dõi đơn: ${trackingUrl}` : "",
+    ""
+  ].join("\n");
+
+  try {
+    await cfg.transporter.sendMail({ from: cfg.from, to: to.trim(), subject, text, html });
+    return { sent: true };
+  } catch (err) {
+    console.error("[mail] Gửi email xác nhận đặt hàng thất bại:", err);
+    return { sent: false, reason: "send_failed" };
+  }
+}
