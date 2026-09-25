@@ -1,9 +1,42 @@
 import express from "express";
 import { Product } from "../models/Product.js";
 import { Order } from "../models/Order.js";
-import { auth, isAdmin } from "../middlewares/auth.js";
+import { auth, isAdmin, isStaff } from "../middlewares/auth.js";
+import { escapeRegex, parsePaging, validateObjectId } from "../utils/validate.js";
+
+const AVAILABILITY = ["in_stock", "pre_order", "limited", "sold_out"];
+
+/** Chỉ cho phép các field admin được sửa (chặn mass-assignment reviews/rating…) */
+function pickProductInput(body = {}, { partial = false } = {}) {
+  const out = {};
+  const str = (v, max) => String(v).trim().slice(0, max);
+  if (body.name !== undefined) out.name = str(body.name, 200);
+  if (body.category !== undefined) out.category = str(body.category, 100);
+  if (body.brand !== undefined) out.brand = str(body.brand, 100);
+  if (body.description !== undefined) out.description = str(body.description, 10000);
+  if (body.variantLabel !== undefined) out.variantLabel = str(body.variantLabel, 200);
+  if (body.price !== undefined) out.price = Number(body.price);
+  if (body.cost !== undefined) out.cost = Number(body.cost);
+  if (body.stock !== undefined) out.stock = Math.floor(Number(body.stock));
+  if (body.featured !== undefined) out.featured = Boolean(body.featured);
+  if (body.availability !== undefined) out.availability = body.availability;
+  if (body.images !== undefined) {
+    out.images = (Array.isArray(body.images) ? body.images : [])
+      .filter((u) => typeof u === "string" && (u.startsWith("/uploads/") || /^https:\/\//i.test(u)))
+      .slice(0, 20);
+  }
+  const errs = [];
+  if (!partial || out.name !== undefined) if (!out.name) errs.push("Name is required");
+  if (!partial || out.category !== undefined) if (!out.category) errs.push("Category is required");
+  if (!partial || out.price !== undefined) if (!Number.isFinite(out.price) || out.price < 0) errs.push("Price must be >= 0");
+  if (out.stock !== undefined && (!Number.isFinite(out.stock) || out.stock < 0)) errs.push("Stock must be >= 0");
+  if (out.cost !== undefined && (!Number.isFinite(out.cost) || out.cost < 0)) errs.push("Cost must be >= 0");
+  if (out.availability !== undefined && !AVAILABILITY.includes(out.availability)) errs.push("Invalid availability");
+  return { data: out, error: errs[0] || "" };
+}
 
 const router = express.Router();
+router.param("id", validateObjectId);
 
 // Top sản phẩm mới nhất
 router.get("/new", async (req, res) => {
@@ -42,15 +75,24 @@ router.get("/", async (req, res) => {
     const { category, search, minPrice, maxPrice } = req.query;
     const filter = {};
 
-    if (category) filter.category = category;
-    if (search) filter.name = { $regex: search, $options: "i" };
+    if (typeof category === "string" && category) filter.category = category;
+    if (typeof search === "string" && search.trim()) {
+      filter.name = { $regex: escapeRegex(search.trim().slice(0, 100)), $options: "i" };
+    }
     if (minPrice || maxPrice) {
       filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
+      if (Number.isFinite(Number(minPrice)) && minPrice !== undefined && minPrice !== "") filter.price.$gte = Number(minPrice);
+      if (Number.isFinite(Number(maxPrice)) && maxPrice !== undefined && maxPrice !== "") filter.price.$lte = Number(maxPrice);
+      if (!Object.keys(filter.price).length) delete filter.price;
     }
 
-    const products = await Product.find(filter).sort({ createdAt: -1 });
+    // Mặc định tối đa 200 sản phẩm (trả về mảng); dùng ?page=&limit= để phân trang
+    const { limit, skip } = parsePaging(req.query, { defaultLimit: 200, maxLimit: 500 });
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Product.countDocuments(filter)
+    ]);
+    res.set("X-Total-Count", String(total));
     return res.json(products);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
@@ -86,7 +128,7 @@ router.get("/:id/reviews", async (req, res) => {
 router.post("/:id/reviews", auth, async (req, res) => {
   try {
     const rating = Number(req.body?.rating);
-    const comment = String(req.body?.comment || "").trim();
+    const comment = String(req.body?.comment || "").trim().slice(0, 2000);
     if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
       return res.status(400).json({ message: "Rating phải từ 1 đến 5" });
     }
@@ -133,28 +175,22 @@ router.post("/:id/reviews", auth, async (req, res) => {
   }
 });
 
-router.post("/", auth, isAdmin, async (req, res) => {
+router.post("/", auth, isStaff, async (req, res) => {
   try {
-    const { name, price, category } = req.body;
-    if (!name || typeof name !== "string") {
-      return res.status(400).json({ message: "Name is required" });
-    }
-    if (!category || typeof category !== "string") {
-      return res.status(400).json({ message: "Category is required" });
-    }
-    if (!Number.isFinite(Number(price)) || Number(price) < 0) {
-      return res.status(400).json({ message: "Price must be >= 0" });
-    }
-    const product = await Product.create(req.body);
+    const { data, error } = pickProductInput(req.body);
+    if (error) return res.status(400).json({ message: error });
+    const product = await Product.create(data);
     return res.status(201).json(product);
   } catch (error) {
     return res.status(400).json({ message: "Invalid product data" });
   }
 });
 
-router.put("/:id", auth, isAdmin, async (req, res) => {
+router.put("/:id", auth, isStaff, async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    const { data, error } = pickProductInput(req.body, { partial: true });
+    if (error) return res.status(400).json({ message: error });
+    const product = await Product.findByIdAndUpdate(req.params.id, { $set: data }, {
       new: true,
       runValidators: true
     });
@@ -165,7 +201,7 @@ router.put("/:id", auth, isAdmin, async (req, res) => {
   }
 });
 
-router.delete("/:id", auth, isAdmin, async (req, res) => {
+router.delete("/:id", auth, isStaff, async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) return res.status(404).json({ message: "Product not found" });

@@ -14,6 +14,8 @@ const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     price: { type: Number, required: true, min: 0 },
+    /** Giá vốn / đơn vị — dùng tính giá vốn hàng bán (COGS) khi giao hàng */
+    cost: { type: Number, default: 0, min: 0 },
     category: { type: String, required: true, trim: true },
     brand: { type: String, trim: true },
     description: { type: String, trim: true },
