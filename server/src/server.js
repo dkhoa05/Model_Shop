@@ -1,9 +1,15 @@
 import express from "express";
 import cors from "cors";
-import morgan from "morgan";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import { allowedOrigins, assertProductionConfig } from "./config/env.js";
+import { apiLimiter, aiLimiter, csrfGuard } from "./middlewares/security.js";
+import pinoHttp from "pino-http";
+import crypto from "crypto";
+import mongoose from "mongoose";
+import { logger } from "./utils/logger.js";
 import dotenv from "dotenv";
 import path from "path";
-import fs from "fs";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import { UPLOADS_DIR } from "./config/upload.js";
@@ -37,29 +43,66 @@ if (envResult.error && process.env.NODE_ENV !== "test") {
   console.warn("[env] Không đọc được file .env tại:", envPath, envResult.error.message);
 }
 
+assertProductionConfig();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Vì giờ frontend + backend cùng 1 domain, CORS không còn quá quan trọng.
-// Giữ thoáng để local/dev không bị oẳng.
+// Sau reverse proxy (Nginx/Render/…): đặt TRUST_PROXY=1 để rate-limit thấy IP thật
+if (process.env.TRUST_PROXY) app.set("trust proxy", Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+app.disable("x-powered-by");
+
+// Ảnh /uploads được nhúng từ origin khác (Next.js) → cho phép cross-origin resource
+app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
 app.use(
   cors({
-    origin: true,
+    origin(origin, cb) {
+      // Không có Origin (curl, server-to-server, same-origin) → cho qua; có Origin thì phải nằm trong whitelist
+      if (!origin || allowedOrigins().includes(origin.replace(/\/$/, ""))) return cb(null, true);
+      return cb(null, false);
+    },
     credentials: true
   })
 );
 
-app.use(express.json());
-app.use(morgan("dev"));
-app.use("/uploads", express.static(UPLOADS_DIR));
+// Log mỗi request kèm request id (client có thể gửi X-Request-Id; luôn trả lại trong header phản hồi)
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req, res) => {
+      const id = String(req.headers["x-request-id"] || "").slice(0, 64) || crypto.randomUUID();
+      res.setHeader("X-Request-Id", id);
+      return id;
+    },
+    autoLogging: { ignore: (req) => req.url === "/api/health" },
+    customLogLevel: (req, res, err) => (err || res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info"),
+    serializers: {
+      req: (req) => ({ id: req.id, method: req.method, url: req.url }),
+      res: (res) => ({ statusCode: res.statusCode })
+    }
+  })
+);
+app.use(express.json({ limit: "100kb" }));
+app.use(cookieParser());
+app.use(
+  "/uploads",
+  express.static(UPLOADS_DIR, {
+    index: false,
+    dotfiles: "deny",
+    setHeaders: (res) => res.setHeader("Content-Disposition", "inline")
+  })
+);
+app.use("/api", apiLimiter, csrfGuard);
+app.use("/api/ai", aiLimiter);
 
 // ===== API routes =====
+/** Health check cho load balancer / Docker: 503 nếu chưa kết nối được MongoDB */
 app.get("/api/health", (req, res) => {
-  res.json({ message: "Model Shop API running" });
+  const dbUp = mongoose.connection.readyState === 1;
+  res.status(dbUp ? 200 : 503).json({ status: dbUp ? "ok" : "degraded", db: dbUp ? "up" : "down", uptime: Math.round(process.uptime()) });
 });
 
-app.get("/", (req, res, next) => {
-  if (hasCustomerBuild) return next();
+app.get("/", (req, res) => {
   return res.json({ message: "Model Shop API running", health: "/api/health" });
 });
 
@@ -83,70 +126,58 @@ app.use("/api/coupons", couponRoutes);
 app.use("/api/payment-config", paymentConfigRoutes);
 app.use("/api/ai", aiRoutes);
 
-// ===== Static frontend paths =====
-const publicDir = path.join(__dirname, "../public");
-const customerDist = path.join(publicDir, "customer");
-const adminDist = path.join(publicDir, "admin");
-
-const customerIndex = path.join(customerDist, "index.html");
-const adminIndex = path.join(adminDist, "index.html");
-
-const hasCustomerBuild = fs.existsSync(customerIndex);
-const hasAdminBuild = fs.existsSync(adminIndex);
-
-if (hasAdminBuild) {
-  app.use("/admin", express.static(adminDist));
-}
-
-if (hasCustomerBuild) {
-  app.use(express.static(customerDist));
-}
-
-// ===== SPA fallback =====
-if (hasAdminBuild) {
-  app.get("/admin/*splat", (req, res) => {
-    res.sendFile(adminIndex);
-  });
-}
-
-if (hasCustomerBuild) {
-  app.get("/*splat", (req, res, next) => {
-    // Không nuốt /api
-    if (req.path.startsWith("/api")) return next();
-    if (req.path.startsWith("/uploads")) return next();
-    if (req.path.startsWith("/admin") && hasAdminBuild) return next();
-    res.sendFile(customerIndex);
-  });
-}
+// Frontend chạy tách riêng (Next.js customer, Vite admin) — server chỉ phục vụ API và /uploads.
+app.use("/api", (req, res) => res.status(404).json({ message: "Not found" }));
 
 // ===== Error handler =====
 app.use((err, req, res, next) => {
-  console.error(err);
   if (err?.message?.includes("Only jpeg/png/webp allowed")) {
     return res.status(400).json({ message: err.message });
   }
   if (err?.code === "LIMIT_FILE_SIZE") {
     return res.status(400).json({ message: "File too large (max 5MB)" });
   }
-  res.status(500).json({ message: "Internal server error" });
+  if (err?.type === "entity.parse.failed" || err?.type === "entity.too.large") {
+    return res.status(err.status || 400).json({ message: "Dữ liệu gửi lên không hợp lệ" });
+  }
+  (req.log || logger).error({ err }, "unhandled error");
+  res.status(500).json({ message: "Internal server error", requestId: req.id });
 });
 
 const start = async () => {
   await connectDB();
-  app.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-    console.log(`[static] customer build: ${hasCustomerBuild ? "found" : "missing"}`);
-    console.log(`[static] admin build: ${hasAdminBuild ? "found" : "missing"}`);
-
-    const h = process.env.SMTP_HOST?.trim();
-    const u = process.env.SMTP_USER?.trim();
-    const p = process.env.SMTP_PASS?.trim();
-    if (h && u && p) {
-      console.log("[env] SMTP: đã nạp HOST/USER/PASS.");
-    } else {
-      console.log("[env] SMTP: thiếu biến.");
-    }
+  const server = app.listen(PORT, () => {
+    logger.info({ port: PORT, env: process.env.NODE_ENV || "development" }, "server listening");
+    const smtpOk = ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every((k) => process.env[k]?.trim());
+    logger.info({ smtp: smtpOk ? "configured" : "missing" }, "smtp status");
   });
+
+  // Tắt êm: ngừng nhận kết nối mới, chờ request đang chạy, đóng MongoDB (Docker/K8s gửi SIGTERM khi deploy)
+  let closing = false;
+  const shutdown = (signal) => {
+    if (closing) return;
+    closing = true;
+    logger.info({ signal }, "shutting down");
+    const force = setTimeout(() => process.exit(1), 15000);
+    force.unref();
+    server.close(async () => {
+      await mongoose.disconnect().catch(() => undefined);
+      process.exit(0);
+    });
+  };
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 };
 
-start();
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ err: reason }, "unhandledRejection");
+  process.exit(1);
+});
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "uncaughtException");
+  process.exit(1);
+});
+
+if (process.env.NODE_ENV !== "test") start();
+
+export default app;
