@@ -1,0 +1,97 @@
+# Chạy production trên 1 máy chủ:  docker compose --env-file .env.production up -d --build
+# Yêu cầu: 3 domain trỏ về máy chủ (SHOP_DOMAIN, ADMIN_DOMAIN, API_DOMAIN); Caddy tự cấp HTTPS.
+name: model-shop
+
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Replica set 1 node: bắt buộc để dùng transaction (đặt hàng/hủy đơn/hoàn tiền)
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --quiet --eval
+        "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }).ok }"
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
+    # Không publish cổng 27017 ra ngoài: chỉ các service trong mạng nội bộ truy cập được
+
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: mongodb://mongo:27017/model_shop?replicaSet=rs0
+      JWT_SECRET: ${JWT_SECRET:?đặt JWT_SECRET trong .env.production}
+      CORS_ORIGINS: https://${SHOP_DOMAIN},https://${ADMIN_DOMAIN}
+      FRONTEND_URL: https://${SHOP_DOMAIN}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      TRUST_PROXY: 1
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SHIPPING_FLAT_FEE: ${SHIPPING_FLAT_FEE:-30000}
+      FREE_SHIPPING_THRESHOLD: ${FREE_SHIPPING_THRESHOLD:-500000}
+      STORE_PICKUP_ADDRESS: ${STORE_PICKUP_ADDRESS:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    volumes:
+      - uploads:/app/server/uploads
+
+  customer:
+    build:
+      context: .
+      dockerfile: client-customer/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://${API_DOMAIN}
+        NEXT_PUBLIC_ADMIN_URL: https://${ADMIN_DOMAIN}
+        NEXT_PUBLIC_SITE_URL: https://${SHOP_DOMAIN}
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  admin:
+    build:
+      context: .
+      dockerfile: client-admin/Dockerfile
+      args:
+        VITE_API_BASE: https://${API_DOMAIN}/api
+        VITE_CUSTOMER_APP_URL: https://${SHOP_DOMAIN}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+      - customer
+      - admin
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SHOP_DOMAIN: ${SHOP_DOMAIN}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  mongo-data:
+  uploads:
+  caddy-data:
+  caddy-config:
