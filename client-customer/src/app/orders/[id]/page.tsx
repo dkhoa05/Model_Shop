@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Button from "@/components/Button";
 import EmptyState from "@/components/EmptyState";
 import { apiFetch } from "@/lib/api";
+import { getGuestOrderToken } from "@/lib/guestOrders";
+import PaymentPanel from "@/components/PaymentPanel";
 import { formatVND } from "@/utils/currency";
 
 interface ApiOrderItem {
@@ -34,6 +36,7 @@ interface ApiOrder {
   couponCode?: string;
   paymentMethod: string;
   paymentStatus: string;
+  paymentProofUrl?: string;
   status: string;
   createdAt: string;
 }
@@ -51,32 +54,47 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<ApiOrder | null>(null);
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem("model-shop-last-api-order");
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as ApiOrder;
-        if (parsed._id === params.id) {
-          setOrder(parsed);
-          setLoaded(true);
-          return;
-        }
-      } catch {
-        window.localStorage.removeItem("model-shop-last-api-order");
-      }
-    }
+  const [cancelError, setCancelError] = useState("");
+  const [cancelling, setCancelling] = useState(false);
 
-    apiFetch<ApiOrder[]>("/orders/my")
-      .then((orders) => setOrder(orders.find((item) => item._id === params.id) || null))
+  const loadOrder = useCallback(() => {
+    const guestToken = getGuestOrderToken(params.id);
+    const request = guestToken
+      ? apiFetch<ApiOrder>(`/orders/guest/${params.id}?token=${encodeURIComponent(guestToken)}`)
+      : apiFetch<ApiOrder[]>("/orders/my").then((orders) => orders.find((item) => item._id === params.id) || null);
+
+    return request
+      .then((result) => setOrder(result))
       .catch(() => setOrder(null))
       .finally(() => setLoaded(true));
   }, [params.id]);
+
+  useEffect(() => {
+    loadOrder();
+  }, [loadOrder]);
+
+  const handleCancel = async () => {
+    if (!window.confirm("Bạn chắc chắn muốn hủy đơn hàng này?")) return;
+    setCancelError("");
+    setCancelling(true);
+    try {
+      await apiFetch(`/orders/${params.id}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ token: getGuestOrderToken(params.id) })
+      });
+      await loadOrder();
+    } catch (err) {
+      setCancelError(err instanceof Error ? err.message : "Không hủy được đơn hàng.");
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   if (loaded && !order) {
     return (
       <EmptyState
         title="Không tìm thấy đơn hàng"
-        description="Nếu bạn đặt hàng không đăng nhập, hãy giữ lại trang xác nhận sau khi checkout hoặc liên hệ shop bằng số điện thoại đặt hàng."
+        description="Nếu bạn đặt hàng không đăng nhập, hãy mở lại đơn trên cùng trình duyệt đã đặt hàng, hoặc liên hệ shop kèm mã đơn."
         actionLabel="Về trang sản phẩm"
         actionHref="/products"
       />
@@ -105,11 +123,30 @@ export default function OrderDetailPage() {
             <span className="rounded-full bg-zinc-950 px-3 py-1 text-sm font-bold text-zinc-300">{order.paymentMethod.toUpperCase()}</span>
             <span className="rounded-full bg-zinc-950 px-3 py-1 text-sm font-bold text-zinc-300">{order.paymentStatus}</span>
           </div>
+          {order.status === "pending" && order.paymentStatus !== "paid" && (
+            <div className="w-full">
+              <button onClick={handleCancel} disabled={cancelling} className="rounded-xl border border-red-500/40 px-4 py-2 text-xs font-black uppercase text-red-300 hover:bg-red-500/10 disabled:opacity-50">
+                {cancelling ? "Đang hủy..." : "Hủy đơn hàng"}
+              </button>
+              {cancelError && <p className="mt-2 text-sm font-bold text-red-300">{cancelError}</p>}
+            </div>
+          )}
         </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="grid gap-4">
+          {order.paymentMethod !== "cod" && order.paymentStatus !== "paid" && order.status !== "cancelled" && (
+            <PaymentPanel
+              orderId={order._id}
+              paymentMethod={order.paymentMethod}
+              paymentRef={order.paymentRef}
+              total={order.totalPrice}
+              proofUrl={order.paymentProofUrl}
+              guestToken={getGuestOrderToken(order._id)}
+              onSubmitted={loadOrder}
+            />
+          )}
           {order.items.map((item, index) => (
             <article key={`${item.product?._id || index}`} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
               <div className="flex gap-4">

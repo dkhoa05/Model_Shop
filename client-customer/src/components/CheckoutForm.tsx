@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
 import { apiFetch } from "@/lib/api";
+import { saveGuestOrderToken } from "@/lib/guestOrders";
 import { formatVND } from "@/utils/currency";
 import Button from "./Button";
 
@@ -15,12 +16,13 @@ const initialValues = {
   email: "",
   address: "",
   note: "",
-  shippingMethod: "standard",
+  deliveryType: "delivery",
   paymentMethod: "cod"
 };
 
 interface ApiOrder {
   _id: string;
+  accessToken?: string;
   [key: string]: unknown;
 }
 
@@ -30,7 +32,7 @@ interface CouponPreview {
   error: string | null;
 }
 
-export default function CheckoutForm() {
+export default function CheckoutForm({ onSummaryChange }: { onSummaryChange?: (s: { deliveryType: string; discount: number }) => void }) {
   const router = useRouter();
   const { user, updateProfile } = useAuth();
   const { cartItems, clearCart } = useCart();
@@ -46,6 +48,18 @@ export default function CheckoutForm() {
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMessage, setCouponMessage] = useState("");
+  const [enabledMethods, setEnabledMethods] = useState<string[]>(["cod"]);
+  const { shippingConfig } = useCart();
+
+  useEffect(() => {
+    onSummaryChange?.({ deliveryType: values.deliveryType, discount: couponDiscount });
+  }, [values.deliveryType, couponDiscount, onSummaryChange]);
+
+  useEffect(() => {
+    apiFetch<{ enabledMethods?: string[] }>("/payment-config")
+      .then((cfg) => setEnabledMethods(cfg.enabledMethods?.length ? cfg.enabledMethods : ["cod"]))
+      .catch(() => setEnabledMethods(["cod"]));
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -111,7 +125,7 @@ export default function CheckoutForm() {
     if (!values.name.trim()) nextErrors.name = "Vui lòng nhập họ tên.";
     if (!/^0\d{9}$/.test(values.phone.trim())) nextErrors.phone = "Số điện thoại cần có 10 chữ số và bắt đầu bằng 0.";
     if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) nextErrors.email = "Email chưa hợp lệ.";
-    if (values.address.trim().length < 10) nextErrors.address = "Vui lòng nhập địa chỉ giao hàng chi tiết hơn.";
+    if (values.deliveryType === "delivery" && values.address.trim().length < 10) nextErrors.address = "Vui lòng nhập địa chỉ giao hàng chi tiết hơn.";
     if (cartItems.length === 0) nextErrors.cart = "Giỏ hàng đang trống.";
 
     setErrors(nextErrors);
@@ -137,7 +151,8 @@ export default function CheckoutForm() {
           phone: values.phone,
           address: values.address,
           addressDetail: values.address,
-          deliveryType: "delivery",
+          note: values.note,
+          deliveryType: values.deliveryType,
           paymentMethod: values.paymentMethod,
           couponCode: couponCode.trim(),
           items: cartItems.map((item) => ({
@@ -147,7 +162,8 @@ export default function CheckoutForm() {
         })
       });
 
-      window.localStorage.setItem("model-shop-last-api-order", JSON.stringify(order));
+      // Khách vãng lai: giữ token của riêng đơn này để xem/hủy đơn (server chỉ trả token một lần)
+      if (order.accessToken) saveGuestOrderToken(order._id, order.accessToken);
       clearCart();
       router.push(`/orders/${order._id}`);
     } catch (err) {
@@ -173,20 +189,28 @@ export default function CheckoutForm() {
         <Field label="Họ tên" error={errors.name}><input value={values.name} onChange={(event) => update("name", event.target.value)} className="input" placeholder="Nguyễn Văn A" /></Field>
         <Field label="Số điện thoại" error={errors.phone}><input value={values.phone} onChange={(event) => update("phone", event.target.value)} className="input" placeholder="0900000000" /></Field>
       </div>
-      <Field label="Email" error={errors.email}><input value={values.email} onChange={(event) => update("email", event.target.value)} className="input" placeholder="you@example.com" /></Field>
-      <Field label="Địa chỉ" error={errors.address}><textarea value={values.address} onChange={(event) => update("address", event.target.value)} className="input min-h-24 py-3" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" /></Field>
+      <Field label="Email" error={errors.email}><input value={values.email} onChange={(event) => update("email", event.target.value)} className="input" placeholder="you@example.com" type="email" /></Field>
+      {values.deliveryType === "delivery" && <Field label="Địa chỉ" error={errors.address}><textarea value={values.address} onChange={(event) => update("address", event.target.value)} className="input min-h-24 py-3" placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành" /></Field>}
       <Field label="Ghi chú"><textarea value={values.note} onChange={(event) => update("note", event.target.value)} className="input min-h-20 py-3" placeholder="Thời gian nhận hàng, lưu ý đóng gói..." /></Field>
 
       <section className="grid gap-3">
-        <h2 className="text-sm font-black uppercase tracking-wide text-white">Shipping method</h2>
-        <Radio label="Giao tiêu chuẩn" desc="2-4 ngày làm việc" name="shipping" checked={values.shippingMethod === "standard"} onChange={() => update("shippingMethod", "standard")} />
-        <Radio label="Giao nhanh nội thành" desc="Trong ngày tại TP.HCM nếu đơn xác nhận trước 14:00" name="shipping" checked={values.shippingMethod === "express"} onChange={() => update("shippingMethod", "express")} />
+        <h2 className="text-sm font-black uppercase tracking-wide text-white">Hình thức nhận hàng</h2>
+        <Radio label="Giao tận nơi" desc={`Phí ${formatVND(shippingConfig.shippingFlatFee)}, miễn phí cho đơn từ ${formatVND(shippingConfig.freeShippingThreshold)}`} name="delivery" checked={values.deliveryType === "delivery"} onChange={() => update("deliveryType", "delivery")} />
+        <Radio label="Nhận tại cửa hàng" desc={shippingConfig.pickupAddress || "Nhận trực tiếp tại cửa hàng, không mất phí giao hàng"} name="delivery" checked={values.deliveryType === "pickup"} onChange={() => update("deliveryType", "pickup")} />
       </section>
 
       <section className="grid gap-3">
         <h2 className="text-sm font-black uppercase tracking-wide text-white">Payment method</h2>
         <Radio label="COD" desc="Thanh toán khi nhận hàng" name="payment" checked={values.paymentMethod === "cod"} onChange={() => update("paymentMethod", "cod")} />
-        <Radio label="Bank transfer" desc="Chuyển khoản ngân hàng sau khi shop xác nhận tồn kho" name="payment" checked={values.paymentMethod === "bank_transfer"} onChange={() => update("paymentMethod", "bank_transfer")} />
+        {enabledMethods.includes("bank_transfer") && (
+          <Radio label="Chuyển khoản ngân hàng" desc="Sau khi đặt hàng, chuyển khoản và tải ảnh minh chứng để shop xác nhận" name="payment" checked={values.paymentMethod === "bank_transfer"} onChange={() => update("paymentMethod", "bank_transfer")} />
+        )}
+        {enabledMethods.includes("momo") && (
+          <Radio label="Ví MoMo" desc="Chuyển tiền tới ví MoMo của shop và tải ảnh minh chứng" name="payment" checked={values.paymentMethod === "momo"} onChange={() => update("paymentMethod", "momo")} />
+        )}
+        {enabledMethods.includes("zalopay") && (
+          <Radio label="ZaloPay" desc="Chuyển tiền tới ví ZaloPay của shop và tải ảnh minh chứng" name="payment" checked={values.paymentMethod === "zalopay"} onChange={() => update("paymentMethod", "zalopay")} />
+        )}
       </section>
 
       <section className="grid gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-4">

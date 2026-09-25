@@ -7,13 +7,13 @@ import { useCart } from "@/context/CartContext";
 import { formatVND } from "@/utils/currency";
 
 export default function CartPage() {
-  const { cartItems, subtotal, shipping, total } = useCart();
+  const { cartItems, subtotal, shipping, total, syncNotices, dismissSyncNotices } = useCart();
 
   if (cartItems.length === 0) {
     return (
       <EmptyState
         title="Giỏ hàng đang trống"
-        description="Chọn vài mẫu Gundam, Figure hoặc tools yêu thích để bắt đầu đơn hàng demo."
+        description="Chọn vài mẫu Gundam, Figure hoặc tools yêu thích để bắt đầu đơn hàng của bạn."
         actionLabel="Tiếp tục mua sắm"
         actionHref="/products"
       />
@@ -26,6 +26,14 @@ export default function CartPage() {
         Home / <span className="text-zinc-300">Cart</span>
       </nav>
       <h1 className="font-space-grotesk text-4xl font-black uppercase text-white">Shopping Cart</h1>
+      {syncNotices.length > 0 && (
+        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+          <ul className="list-disc space-y-1 pl-5">
+            {syncNotices.map((notice) => <li key={notice}>{notice}</li>)}
+          </ul>
+          <button onClick={dismissSyncNotices} className="mt-3 text-xs font-black uppercase text-amber-300 underline">Đã hiểu</button>
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <section className="grid gap-4">
@@ -39,10 +47,7 @@ export default function CartPage() {
           <div className="mt-5 grid gap-3 text-sm">
             <Row label="Subtotal" value={formatVND(subtotal)} />
             <Row label="Shipping estimate" value={shipping === 0 ? "Free" : formatVND(shipping)} />
-            <label className="mt-3 grid gap-2 text-sm font-bold text-zinc-300">
-              Discount code
-              <input className="input" placeholder="MODEL10" />
-            </label>
+            <p className="text-xs text-zinc-500">Mã giảm giá được áp dụng ở bước thanh toán.</p>
             <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
               <span className="font-black uppercase text-white">Total</span>
               <span className="text-xl font-black text-red-400">{formatVND(total)}</span>
