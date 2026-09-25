@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { api } from "../services/api.js";
+import { BACKOFFICE_ROLES } from "../lib/roles.js";
 
 export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
@@ -13,7 +14,7 @@ export default function LoginPage() {
   const { user, login } = useAuth();
 
   useEffect(() => {
-    if (user?.role === "admin") navigate("/admin", { replace: true });
+    if (BACKOFFICE_ROLES.includes(user?.role)) navigate("/admin", { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (event) => {
@@ -23,11 +24,11 @@ export default function LoginPage() {
 
     try {
       const response = await api.post("/auth/login", { identifier, password });
-      if (response.data.user?.role !== "admin") {
-        setError("Tài khoản này không có quyền admin.");
+      if (!BACKOFFICE_ROLES.includes(response.data.user?.role)) {
+        setError("Tài khoản này không có quyền vào trang quản trị.");
         return;
       }
-      login(response.data.token, response.data.user);
+      login(response.data.user);
       navigate("/admin", { replace: true });
     } catch {
       setError("Email/tên đăng nhập hoặc mật khẩu không đúng.");

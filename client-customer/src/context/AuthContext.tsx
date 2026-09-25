@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
-export type UserRole = "customer" | "admin";
+export type UserRole = "customer" | "admin" | "staff" | "accountant";
 
 export interface AuthUser {
   id: string;
@@ -16,7 +16,8 @@ export interface AuthUser {
 
 interface AuthContextValue {
   user: AuthUser | null;
-  token: string;
+  /** true khi đã hỏi server xong trạng thái đăng nhập */
+  ready: boolean;
   login: (identifier: string, password: string) => Promise<AuthUser>;
   register: (payload: Omit<AuthUser, "id" | "role"> & { password: string; username?: string }) => Promise<AuthUser>;
   updateProfile: (payload: Partial<AuthUser>) => Promise<void>;
@@ -30,44 +31,39 @@ interface ApiUser {
   email: string;
   username?: string;
   phone?: string;
-  role: "user" | "admin";
+  address?: string;
+  role: "user" | "admin" | "staff" | "accountant";
 }
 
 interface LoginResponse {
-  token: string;
   user: ApiUser;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-const AUTH_KEY = "model-shop-auth-user";
-const TOKEN_KEY = "model-shop-auth-token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState("");
+  const [ready, setReady] = useState(false);
 
+  // Nguồn sự thật là server (cookie httpOnly): hỏi /auth/me khi tải trang
   useEffect(() => {
-    const storedToken = window.localStorage.getItem(TOKEN_KEY) || "";
-    const rawUser = window.localStorage.getItem(AUTH_KEY);
-    setToken(storedToken);
-
-    if (rawUser) {
-      try {
-        setUser(JSON.parse(rawUser) as AuthUser);
-      } catch {
-        window.localStorage.removeItem(AUTH_KEY);
-      }
-    }
-  }, []);
-
-  const persist = useCallback((nextUser: AuthUser, nextToken?: string) => {
-    setUser(nextUser);
-    window.localStorage.setItem(AUTH_KEY, JSON.stringify(nextUser));
-
-    if (nextToken) {
-      setToken(nextToken);
-      window.localStorage.setItem(TOKEN_KEY, nextToken);
-    }
+    let cancelled = false;
+    // dọn dữ liệu phiên cũ từng lưu trong localStorage
+    window.localStorage.removeItem("model-shop-auth-token");
+    window.localStorage.removeItem("model-shop-auth-user");
+    apiFetch<ApiUser>("/auth/me")
+      .then((me) => {
+        if (!cancelled) setUser(mapApiUser(me));
+      })
+      .catch(() => {
+        if (!cancelled) setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(
@@ -77,10 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ identifier, password })
       });
       const nextUser = mapApiUser(response.user);
-      persist(nextUser, response.token);
+      setUser(nextUser);
       return nextUser;
     },
-    [persist]
+    []
   );
 
   const register = useCallback(
@@ -107,35 +103,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateProfile = useCallback(
     async (payload: Partial<AuthUser>) => {
       if (!user) return;
-
-      try {
-        const updated = await apiFetch<ApiUser>("/auth/me", {
-          method: "PUT",
-          body: JSON.stringify({
-            name: payload.name || user.name,
-            phone: payload.phone || user.phone || ""
-          })
-        });
-        persist({ ...user, ...mapApiUser(updated), address: payload.address || user.address });
-      } catch {
-        const nextUser = { ...user, ...payload };
-        setUser(nextUser);
-        window.localStorage.setItem(AUTH_KEY, JSON.stringify(nextUser));
-      }
+      const updated = await apiFetch<ApiUser>("/auth/me", {
+        method: "PUT",
+        body: JSON.stringify({
+          name: payload.name || user.name,
+          phone: payload.phone ?? user.phone ?? "",
+          address: payload.address ?? user.address ?? ""
+        })
+      });
+      setUser({ ...user, ...mapApiUser(updated) });
     },
-    [persist, user]
+    [user]
   );
 
   const logout = useCallback(() => {
     setUser(null);
-    setToken("");
-    window.localStorage.removeItem(AUTH_KEY);
-    window.localStorage.removeItem(TOKEN_KEY);
+    apiFetch("/auth/logout", { method: "POST" }).catch(() => {});
   }, []);
 
   const value = useMemo(
-    () => ({ user, token, login, register, updateProfile, logout }),
-    [login, logout, register, token, updateProfile, user]
+    () => ({ user, ready, login, register, updateProfile, logout }),
+    [login, logout, ready, register, updateProfile, user]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -147,7 +135,8 @@ function mapApiUser(apiUser: ApiUser): AuthUser {
     name: apiUser.name,
     email: apiUser.email,
     phone: apiUser.phone,
-    role: apiUser.role === "admin" ? "admin" : "customer"
+    address: apiUser.address,
+    role: apiUser.role === "user" ? "customer" : apiUser.role
   };
 }
 

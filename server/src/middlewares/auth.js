@@ -1,33 +1,30 @@
-import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
+import { extractToken, resolveUser } from "../utils/authToken.js";
 
 export const auth = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const token = authHeader.split(" ")[1];
-
+  const { token } = extractToken(req);
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev_secret");
-    const user = await User.findById(decoded.id).select("-password");
-    if (!user) {
-      return res.status(401).json({ message: "User not found" });
-    }
-    if (user.isBlocked) {
-      return res.status(403).json({ message: "Account is blocked" });
-    }
-    req.user = user;
+    const r = await resolveUser(token, User);
+    if (r.error) return res.status(r.status).json({ message: r.error });
+    req.user = r.user;
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: "Invalid token" });
   }
 };
 
-export const isAdmin = (req, res, next) => {
-  if (req.user?.role !== "admin") {
-    return res.status(403).json({ message: "Forbidden: Admin only" });
+/** Vai trò nội bộ: admin (toàn quyền), staff (bán hàng/kho), accountant (kế toán/duyệt hoàn tiền) */
+export const BACKOFFICE_ROLES = ["admin", "staff", "accountant"];
+
+export const allow = (...roles) => (req, res, next) => {
+  if (!roles.includes(req.user?.role)) {
+    return res.status(403).json({ message: "Forbidden: không đủ quyền" });
   }
   next();
 };
+
+export const isAdmin = allow("admin");
+export const isStaff = allow("admin", "staff");
+export const isFinance = allow("admin", "accountant");
+export const isBackoffice = allow(...BACKOFFICE_ROLES);

@@ -37,10 +37,14 @@ function getImageUrlByCategory(category) {
 }
 
 const run = async () => {
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED_IN_PRODUCTION !== "yes") {
+    console.error("Từ chối chạy seed ở production (seed xóa/ghi đè dữ liệu). Đặt ALLOW_SEED_IN_PRODUCTION=yes nếu thật sự cần.");
+    process.exit(1);
+  }
   await connectDB();
 
   const adminEmail = "admin@modelshop.com";
-  const adminPassword = "Admin@123";
+  const adminPassword = process.env.SEED_PASSWORD || "Admin@123"; // chỉ dùng cho dev/local
 
   const hashed = await bcrypt.hash(adminPassword, 10);
   const admin = await User.findOneAndUpdate(

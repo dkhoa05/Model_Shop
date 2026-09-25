@@ -1,26 +1,18 @@
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 export const API_BASE = `${API_BASE_URL}/api`;
 
-export function getAuthToken() {
-  if (typeof window === "undefined") return "";
-  return window.localStorage.getItem("model-shop-auth-token") || "";
-}
-
+/** Phiên đăng nhập nằm trong cookie httpOnly (server cấp) — trình duyệt tự gửi, JS không đọc được. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getAuthToken();
   const headers = new Headers(init.headers);
 
-  if (!headers.has("Content-Type") && init.body) {
+  if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
-  }
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
   }
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers
+    headers,
+    credentials: "include"
   });
 
   const payload = await response.json().catch(() => null);

@@ -7,8 +7,10 @@ const userSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     phone: { type: String, trim: true },
     avatarUrl: { type: String, trim: true },
-    password: { type: String, required: true },
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    /** Địa chỉ giao hàng mặc định */
+    address: { type: String, trim: true, default: "" },
+    password: { type: String, required: true, select: true },
+    role: { type: String, enum: ["user", "admin", "staff", "accountant"], default: "user" },
     isBlocked: { type: Boolean, default: false },
     paymentMethods: {
       type: [String],
@@ -26,6 +28,8 @@ const userSchema = new mongoose.Schema(
       default: "cod"
     },
     // Stores SHA-256 hash of the reset token (never store the raw token).
+    /** Tăng để vô hiệu hóa mọi phiên đăng nhập cũ (đổi mật khẩu, admin reset…) */
+    tokenVersion: { type: Number, default: 0 },
     resetToken: { type: String },
     resetTokenExpiry: { type: Date }
   },
