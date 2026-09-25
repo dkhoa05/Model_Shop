@@ -36,3 +36,14 @@ client-customer/node_modules/
 
 # Test / coverage
 coverage/
+
+# Uploads (ảnh người dùng/sản phẩm) — không đưa vào git; dùng volume hoặc object storage
+uploads/
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Backups & env production
+backups/
+.env.production
+*.tsbuildinfo
+!.env.production.example
