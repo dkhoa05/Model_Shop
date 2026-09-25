@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { Check, Heart, ShoppingCart, Star } from "lucide-react";
 import { useState } from "react";
-import { Product } from "@/data/products";
+import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
 import { formatVND } from "@/utils/currency";
 import Badge from "./Badge";
+import ProductImage from "./ProductImage";
 
 export default function ProductCard({ product, rank }: { product: Product; rank?: number }) {
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
@@ -36,12 +37,12 @@ export default function ProductCard({ product, rank }: { product: Product; rank?
         <Heart size={16} className={favorited ? "fill-red-500 text-red-500" : ""} />
       </button>
 
-      <Link href={`/product/${product.slug}`} className="block aspect-square overflow-hidden bg-zinc-950">
-        <img
-          src={product.images[0] || "/placeholder.png"}
+      <Link href={`/products/${product.slug}`} className="relative block aspect-square overflow-hidden bg-zinc-950">
+        <ProductImage
+          src={product.images[0]}
           alt={`${product.name} chính hãng tại ModelShop`}
-          className="h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
-          loading="lazy"
+          sizes="(min-width: 1280px) 20vw, (min-width: 640px) 33vw, 50vw"
+          className="object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
         />
       </Link>
 
@@ -52,7 +53,7 @@ export default function ProductCard({ product, rank }: { product: Product; rank?
         </div>
 
         <h3 className="line-clamp-2 min-h-11 text-sm font-bold leading-5 text-white">
-          <Link href={`/product/${product.slug}`} className="hover:text-red-400">
+          <Link href={`/products/${product.slug}`} className="hover:text-red-400">
             {product.name}
           </Link>
         </h3>

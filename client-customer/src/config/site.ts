@@ -1,6 +1,6 @@
 export const siteConfig = {
   name: "ModelShop",
-  url: "https://modelshop.vn",
+  url: process.env.NEXT_PUBLIC_SITE_URL || "https://modelshop.vn",
   description:
     "ModelShop bán mô hình Gundam, Figure Anime, Model Kit và Collectibles chính hãng với trải nghiệm mua hàng hiện đại.",
   contact: {

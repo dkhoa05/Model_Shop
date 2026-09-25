@@ -10,7 +10,8 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
       <p className="mt-3 max-w-xl text-sm leading-6 text-zinc-400">
         Giao diện gặp lỗi khi render. Bạn có thể thử tải lại phần này, hoặc quay về danh sách sản phẩm.
       </p>
-      <p className="mt-3 text-xs text-zinc-600">{error.message}</p>
+      {process.env.NODE_ENV !== "production" && <p className="mt-3 text-xs text-zinc-600">{error.message}</p>}
+      {error.digest && <p className="mt-2 text-xs text-zinc-600">Mã lỗi: {error.digest}</p>}
       <div className="mt-6 flex flex-wrap justify-center gap-3">
         <Button type="button" onClick={reset}>Thử lại</Button>
         <Button href="/products" variant="outline">Xem sản phẩm</Button>
