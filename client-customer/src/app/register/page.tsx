@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import AuthShell from "@/components/AuthShell";
 import Button from "@/components/Button";
+import { Field, Notice } from "@/components/form";
 import { useAuth } from "@/context/AuthContext";
 
 export default function RegisterPage() {
@@ -22,7 +24,7 @@ export default function RegisterPage() {
 
     try {
       await register(form);
-      router.push("/checkout");
+      router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không tạo được tài khoản.");
     } finally {
@@ -31,35 +33,46 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="mx-auto grid min-h-[70vh] max-w-2xl place-items-center">
-      <section className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 p-6">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-red-400">Customer profile</p>
-        <h1 className="mt-3 font-space-grotesk text-3xl font-black uppercase text-white">Đăng ký khách hàng</h1>
-        <p className="mt-3 text-sm leading-6 text-zinc-400">Tạo hồ sơ để checkout nhanh, lưu địa chỉ và nhận ưu đãi thành viên.</p>
-
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Họ tên"><input className="input" value={form.name} onChange={(event) => update("name", event.target.value)} required /></Field>
-            <Field label="Số điện thoại"><input className="input" value={form.phone} onChange={(event) => update("phone", event.target.value)} required /></Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Username"><input className="input" value={form.username} onChange={(event) => update("username", event.target.value)} placeholder="nguyenvana" /></Field>
-            <Field label="Email"><input className="input" value={form.email} onChange={(event) => update("email", event.target.value)} type="email" required /></Field>
-          </div>
-          <Field label="Địa chỉ mặc định"><textarea className="input min-h-24 py-3" value={form.address} onChange={(event) => update("address", event.target.value)} required /></Field>
-          <Field label="Mật khẩu"><input className="input" value={form.password} onChange={(event) => update("password", event.target.value)} type="password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,72}" title="8-72 ký tự, gồm chữ và số" required /></Field>
-          {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-200">{error}</p>}
-          <Button type="submit" className="w-full" disabled={loading}>{loading ? "Đang tạo..." : "Tạo tài khoản"}</Button>
-        </form>
-
-        <p className="mt-5 text-center text-sm text-zinc-400">
-          Đã có tài khoản? <Link href="/login" className="font-bold text-red-400 hover:text-red-300">Đăng nhập</Link>
-        </p>
-      </section>
-    </div>
+    <AuthShell
+      title="Tạo tài khoản"
+      description="Tạo hồ sơ để đặt hàng nhanh hơn và theo dõi đơn dễ dàng."
+      footer={
+        <>
+          Đã có tài khoản?{" "}
+          <Link href="/login" className="link">
+            Đăng nhập
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="grid gap-5">
+        {error && <Notice type="error">{error}</Notice>}
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Họ tên" required>
+            <input className="input" value={form.name} onChange={(e) => update("name", e.target.value)} autoComplete="name" required />
+          </Field>
+          <Field label="Số điện thoại" required>
+            <input className="input" type="tel" inputMode="numeric" value={form.phone} onChange={(e) => update("phone", e.target.value)} autoComplete="tel" required />
+          </Field>
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Tên đăng nhập" hint="3 đến 30 ký tự: chữ thường, số, dấu _ . -">
+            <input className="input" value={form.username} onChange={(e) => update("username", e.target.value)} autoComplete="username" />
+          </Field>
+          <Field label="Email" required>
+            <input className="input" type="email" value={form.email} onChange={(e) => update("email", e.target.value)} autoComplete="email" required />
+          </Field>
+        </div>
+        <Field label="Địa chỉ mặc định" required>
+          <textarea className="input min-h-24" value={form.address} onChange={(e) => update("address", e.target.value)} autoComplete="street-address" required />
+        </Field>
+        <Field label="Mật khẩu" required hint="8 đến 72 ký tự, gồm cả chữ và số">
+          <input className="input" type="password" value={form.password} onChange={(e) => update("password", e.target.value)} autoComplete="new-password" minLength={8} pattern="(?=.*[A-Za-z])(?=.*[0-9]).{8,72}" title="8 đến 72 ký tự, gồm chữ và số" required />
+        </Field>
+        <Button type="submit" loading={loading} className="w-full">
+          {loading ? "Đang tạo..." : "Tạo tài khoản"}
+        </Button>
+      </form>
+    </AuthShell>
   );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-2 text-sm font-bold text-zinc-300">{label}{children}</label>;
 }

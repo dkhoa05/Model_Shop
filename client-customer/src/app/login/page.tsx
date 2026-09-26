@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import AuthShell from "@/components/AuthShell";
 import Button from "@/components/Button";
+import { Field, Notice } from "@/components/form";
 import { useAuth } from "@/context/AuthContext";
 
 export default function LoginPage() {
@@ -11,6 +13,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,34 +37,39 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="mx-auto grid min-h-[70vh] max-w-md place-items-center">
-      <section className="w-full rounded-xl border border-zinc-800 bg-zinc-900/80 p-6">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-red-400">Account</p>
-        <h1 className="mt-3 font-space-grotesk text-3xl font-black uppercase text-white">Đăng nhập</h1>
-        <p className="mt-3 text-sm leading-6 text-zinc-400">
-          Đăng nhập để lưu thông tin giao hàng, xem lịch sử đơn, dùng mã giảm giá.
-        </p>
-
-        <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
-          <label className="grid gap-2 text-sm font-bold text-zinc-300">
-            Email hoặc username
-            <input className="input" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
+    <AuthShell
+      title="Đăng nhập"
+      description="Đăng nhập để theo dõi đơn hàng, lưu địa chỉ và dùng mã giảm giá."
+      footer={
+        <>
+          Chưa có tài khoản?{" "}
+          <Link href="/register" className="link">
+            Đăng ký ngay
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="grid gap-5">
+        {error && <Notice type="error">{error}</Notice>}
+        <Field label="Email hoặc tên đăng nhập" required>
+          <input className="input" value={identifier} onChange={(e) => setIdentifier(e.target.value)} autoComplete="username" required />
+        </Field>
+        <Field label="Mật khẩu" required>
+          <input className="input" type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+        </Field>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300">
+            <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} className="h-5 w-5 accent-[rgb(var(--accent))]" />
+            Hiện mật khẩu
           </label>
-          <label className="grid gap-2 text-sm font-bold text-zinc-300">
-            Mật khẩu
-            <input className="input" value={password} onChange={(event) => setPassword(event.target.value)} type="password" required />
-          </label>
-          {error && <p className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-200">{error}</p>}
-          <Link href="/forgot-password" className="text-right text-xs font-bold text-red-400 hover:text-red-300">Quên mật khẩu?</Link>
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-          </Button>
-        </form>
-
-        <p className="mt-5 text-center text-sm text-zinc-400">
-          Chưa có tài khoản? <Link href="/register" className="font-bold text-red-400 hover:text-red-300">Đăng ký ngay</Link>
-        </p>
-      </section>
-    </div>
+          <Link href="/forgot-password" className="link inline-flex min-h-11 items-center text-sm">
+            Quên mật khẩu?
+          </Link>
+        </div>
+        <Button type="submit" loading={loading} className="w-full">
+          {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
