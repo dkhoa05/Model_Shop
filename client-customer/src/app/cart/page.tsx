@@ -11,12 +11,22 @@ export default function CartPage() {
 
   if (cartItems.length === 0) {
     return (
+      <div className="space-y-4">
+        {syncNotices.length > 0 && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+            <ul className="list-disc space-y-1 pl-5">
+              {syncNotices.map((notice) => <li key={notice}>{notice}</li>)}
+            </ul>
+            <button onClick={dismissSyncNotices} className="mt-3 text-xs font-black uppercase text-amber-300 underline">Đã hiểu</button>
+          </div>
+        )}
       <EmptyState
         title="Giỏ hàng đang trống"
         description="Chọn vài mẫu Gundam, Figure hoặc tools yêu thích để bắt đầu đơn hàng của bạn."
         actionLabel="Tiếp tục mua sắm"
         actionHref="/products"
       />
+      </div>
     );
   }
 
