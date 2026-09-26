@@ -84,6 +84,12 @@ Cập nhật phiên bản: `git pull && docker compose --env-file .env.productio
 - **Đối soát kế toán**: admin/kế toán gọi `POST /api/admin/accounting/reconcile` để ghi sổ bổ sung cho đơn/chi phí cũ (idempotent).
 - **Giám sát lỗi**: chưa tích hợp Sentry/APM; có thể thêm bằng `SENTRY_DSN` khi cần. Nên bật uptime monitor cho `/api/health`.
 
+## Giao diện và khả năng truy cập
+
+- **Web khách**: hệ thiết kế dùng token màu CSS (sáng/tối, mặc định theo hệ thống, có nút đổi), font Be Vietnam Pro, một màu nhấn duy nhất, hiệu ứng bằng `motion` (hiện dần khi cuộn, ảnh hero trượt nhẹ, ánh sáng theo con trỏ trên thẻ sản phẩm).
+- **Admin**: cùng hệ token, giao diện tối; điều hướng theo vai trò, có menu thu gọn trên di động.
+- **Truy cập (WCAG 2.2 AA)**: liên kết "Bỏ qua tới nội dung", vòng focus 3px, vùng chạm tối thiểu 44px, biểu mẫu có nhãn + lỗi gắn `aria-describedby` và chuyển focus tới lỗi đầu tiên, hộp thoại/menu đóng bằng Escape, thông báo qua `aria-live`, tôn trọng `prefers-reduced-motion`. Đã quét bằng axe-core (wcag2a/2aa/21aa/22aa + best-practice): 0 vi phạm trên các trang chính của web khách (cả sáng và tối) và toàn bộ trang admin.
+
 ## Phân quyền
 
 | Vai trò | Quyền chính |
