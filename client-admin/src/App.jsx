@@ -9,6 +9,7 @@ import AdminReportsPage from "./pages/admin/AdminReportsPage.jsx";
 import AdminExpensesPage from "./pages/admin/AdminExpensesPage.jsx";
 import AdminPaymentConfigPage from "./pages/admin/AdminPaymentConfigPage.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
+import { watchAndLabel } from "./lib/a11y.js";
 import { api, API_BASE } from "./services/api.js";
 import { BACKOFFICE_ROLES, ROLE_LABELS, canAccess } from "./lib/roles.js";
 
@@ -38,7 +39,7 @@ const approvalTypes = ["discount", "refund", "purchase", "inventory_adjustment",
 export default function App() {
   const { user, authReady } = useAuth();
   if (!authReady) {
-    return <p className="p-8 text-sm text-slate-400" role="status">Đang xác thực phiên đăng nhập…</p>;
+    return <p className="p-8 text-base text-zinc-300" role="status">Đang xác thực phiên đăng nhập...</p>;
   }
   return (
     <Routes>
@@ -51,48 +52,81 @@ export default function App() {
 function AdminLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [navOpen, setNavOpen] = React.useState(false);
+
+  // Đóng menu di động khi chuyển trang
+  React.useEffect(() => setNavOpen(false), [location.pathname]);
+
+  // Gắn nhãn truy cập cho điều khiển của các trang cũ chưa có nhãn
+  React.useEffect(() => watchAndLabel(document.getElementById("main")), []);
+
+  // Sau khi chuyển trang, đưa focus về vùng nội dung chính (người dùng bàn phím/đọc màn hình biết trang đã đổi)
+  const mainRef = React.useRef(null);
+  const firstRender = React.useRef(true);
+  React.useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    mainRef.current?.focus({ preventScroll: true });
+  }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-[#07080b] text-zinc-100">
-      <div className="fixed inset-0 -z-10 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:36px_36px]" />
+    <div className="min-h-screen bg-zinc-950 text-fg">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-accent focus:px-4 focus:py-3 focus:text-sm focus:font-bold focus:text-on-accent">
+        Bỏ qua để tới nội dung chính
+      </a>
       <header className="sticky top-0 z-30 border-b border-zinc-800 bg-zinc-950/90 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between px-4">
+        <div className="mx-auto flex min-h-16 max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-2">
           <div>
-            <p className="text-lg font-black">MODELSHOP ERP</p>
-            <p className="text-xs text-zinc-500">Sales, CRM, Inventory, Purchasing, Accounting</p>
+            <p className="text-lg font-extrabold tracking-tight">
+              Model<span className="text-accent-text">Shop</span> <span className="font-semibold text-zinc-400">Quản trị</span>
+            </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <a href={import.meta.env.VITE_CUSTOMER_APP_URL || "http://localhost:3000"} target="_blank" rel="noreferrer" className="admin-button-secondary">
-              Storefront
+              Xem cửa hàng<span className="sr-only"> (mở tab mới)</span>
             </a>
             <div className="hidden text-right sm:block">
               <p className="text-sm font-bold">{user?.name || "Admin"}</p>
-              <p className="text-xs text-zinc-500">{user?.email} · {ROLE_LABELS[user?.role] || user?.role}</p>
+              <p className="text-xs text-zinc-400">{user?.email} · {ROLE_LABELS[user?.role] || user?.role}</p>
             </div>
-            <button onClick={logout} className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">
-              Logout
+            <button type="button" onClick={logout} className="admin-button-primary">
+              Đăng xuất
             </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 lg:grid-cols-[250px_1fr]">
-        <aside className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3 lg:sticky lg:top-24">
-          <p className="px-3 text-xs font-black uppercase tracking-[0.2em] text-red-400">Modules</p>
-          <nav className="mt-2 grid gap-1">
+      <div className="mx-auto grid max-w-[1600px] gap-6 px-4 py-6 lg:grid-cols-[15rem_1fr]">
+        <aside className="h-fit rounded-2xl border border-zinc-800 bg-zinc-900 p-3 lg:sticky lg:top-24">
+          <button
+            type="button"
+            className="admin-button-secondary w-full lg:hidden"
+            aria-expanded={navOpen}
+            aria-controls="admin-nav"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            {navOpen ? "Đóng menu" : "Mở menu chức năng"}
+          </button>
+          <nav id="admin-nav" aria-label="Chức năng quản trị" className={`${navOpen ? "grid" : "hidden"} mt-2 gap-1 lg:mt-0 lg:grid`}>
             {navItems.filter((item) => canAccess(user?.role, item.href)).map((item) => {
               const active = location.pathname === item.href;
               return (
-                <Link key={item.href} to={item.href} className={`rounded-xl px-3 py-2 text-sm font-bold transition ${active ? "bg-red-600 text-white" : "text-zinc-300 hover:bg-zinc-950 hover:text-white"}`}>
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold transition ${active ? "bg-accent text-on-accent" : "text-zinc-300 hover:bg-zinc-800 hover:text-fg"}`}
+                >
                   {item.label}
                 </Link>
               );
             })}
           </nav>
-          <p className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-xs text-zinc-500">{API_BASE}</p>
         </aside>
 
-        <main className="min-w-0">
+        <main id="main" ref={mainRef} tabIndex={-1} className="min-w-0 outline-none">
           <Routes>
             <Route path="/" element={<Navigate to="/admin" replace />} />
             <Route path="/admin" element={<DashboardView />} />
@@ -175,12 +209,12 @@ function MovementsView() {
             <input className="admin-input" type="number" min="1" value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} />
             <select className="admin-input" value={form.reason} onChange={(e) => setForm((p) => ({ ...p, reason: e.target.value }))}><option value="manual">manual</option><option value="purchase">purchase</option><option value="sale">sale</option><option value="return">return</option><option value="damage">damage</option></select>
             <textarea className="admin-input min-h-24 py-2" value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="Note" />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Save</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Save</button>
           </form>
         </Panel>
         <Panel title="Recent movements">
           <div className="space-y-2">
-            {movements.map((m) => <div key={m._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-sm"><p className="font-bold text-white">{m.product?.name || "Unknown product"}</p><p className="text-zinc-400">{m.type} {m.quantity} - {m.reason}</p><p className="text-xs text-zinc-500">{new Date(m.createdAt).toLocaleString("vi-VN")}</p></div>)}
+            {movements.map((m) => <div key={m._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-sm"><p className="font-bold text-fg">{m.product?.name || "Unknown product"}</p><p className="text-zinc-400">{m.type} {m.quantity} - {m.reason}</p><p className="text-xs text-zinc-500">{new Date(m.createdAt).toLocaleString("vi-VN")}</p></div>)}
           </div>
         </Panel>
       </div>
@@ -207,14 +241,14 @@ function LeadsView() {
             <select className="admin-input" value={form.source} onChange={(e) => setForm((p) => ({ ...p, source: e.target.value }))}><option value="website">website</option><option value="facebook">facebook</option><option value="zalo">zalo</option><option value="walk_in">walk_in</option><option value="other">other</option></select>
             <input className="admin-input" type="number" min="0" value={form.expectedValue} onChange={(e) => setForm((p) => ({ ...p, expectedValue: e.target.value }))} placeholder="Expected value" />
             <textarea className="admin-input min-h-24 py-2" value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="Note" />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Create</button>
           </form>
         </Panel>
         <Panel title="Lead pipeline">
           <div className="space-y-2">
             {leads.map((lead) => (
               <div key={lead._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                <div className="flex items-center justify-between gap-3"><div><p className="font-bold text-white">{lead.name}</p><p className="text-xs text-zinc-500">{lead.phone || lead.email || "No contact"}</p></div><select className="admin-input h-9 min-w-32" value={lead.stage} onChange={(e) => updateLeadStage(lead._id, e.target.value)}>{leadStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>
+                <div className="flex items-center justify-between gap-3"><div><p className="font-bold text-fg">{lead.name}</p><p className="text-xs text-zinc-500">{lead.phone || lead.email || "No contact"}</p></div><select className="admin-input h-9 min-w-32" value={lead.stage} onChange={(e) => updateLeadStage(lead._id, e.target.value)}>{leadStages.map((stage) => <option key={stage} value={stage}>{stage}</option>)}</select></div>
                 <p className="mt-2 text-sm text-red-300">{formatVND(lead.expectedValue || 0)}</p>
               </div>
             ))}
@@ -242,11 +276,11 @@ function SuppliersView() {
             <input className="admin-input" value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} placeholder="Phone" />
             <input className="admin-input" type="email" value={form.email} onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))} placeholder="Email" />
             <textarea className="admin-input min-h-24 py-2" value={form.address} onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))} placeholder="Address" />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Create</button>
           </form>
         </Panel>
         <Panel title="Supplier list">
-          <div className="space-y-2">{suppliers.map((s) => <div key={s._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="font-bold text-white">{s.name}</p><p className="text-sm text-zinc-400">{s.contactName || "No contact"} | {s.phone || "-"}</p><p className="text-sm text-zinc-500">{s.email || "No email"}</p></div>)}</div>
+          <div className="space-y-2">{suppliers.map((s) => <div key={s._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><p className="font-bold text-fg">{s.name}</p><p className="text-sm text-zinc-400">{s.contactName || "No contact"} | {s.phone || "-"}</p><p className="text-sm text-zinc-500">{s.email || "No email"}</p></div>)}</div>
         </Panel>
       </div>
     </section>
@@ -273,12 +307,12 @@ function PurchaseOrdersView() {
             <input className="admin-input" type="number" min="1" value={form.quantity} onChange={(e) => setForm((p) => ({ ...p, quantity: e.target.value }))} />
             <input className="admin-input" type="number" min="0" value={form.unitCost} onChange={(e) => setForm((p) => ({ ...p, unitCost: e.target.value }))} />
             <input className="admin-input" type="date" value={form.expectedDate} onChange={(e) => setForm((p) => ({ ...p, expectedDate: e.target.value }))} />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create PO</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Create PO</button>
           </form>
         </Panel>
         <Panel title="PO list">
           <div className="space-y-2">
-            {purchaseOrders.map((po) => <div key={po._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><div className="flex items-center justify-between gap-3"><div><p className="font-bold text-white">{po.code}</p><p className="text-xs text-zinc-500">{po.supplier?.name || "No supplier"} | {po.status}</p><p className="text-xs text-amber-300">{po.requiresApproval ? `Approval: ${po.approvalRequest?.status || "pending"}` : "No approval required"}</p></div>{po.status !== "received" && po.status !== "cancelled" ? <button onClick={() => receivePo(po._id)} className="admin-button-secondary">Receive</button> : null}</div><p className="mt-2 text-sm text-zinc-400">Total: <span className="font-bold text-red-300">{formatVND(po.totalAmount || 0)}</span></p></div>)}
+            {purchaseOrders.map((po) => <div key={po._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3"><div className="flex items-center justify-between gap-3"><div><p className="font-bold text-fg">{po.code}</p><p className="text-xs text-zinc-500">{po.supplier?.name || "No supplier"} | {po.status}</p><p className="text-xs text-amber-300">{po.requiresApproval ? `Approval: ${po.approvalRequest?.status || "pending"}` : "No approval required"}</p></div>{po.status !== "received" && po.status !== "cancelled" ? <button onClick={() => receivePo(po._id)} className="admin-button-secondary">Receive</button> : null}</div><p className="mt-2 text-sm text-zinc-400">Total: <span className="font-bold text-red-300">{formatVND(po.totalAmount || 0)}</span></p></div>)}
           </div>
         </Panel>
       </div>
@@ -361,7 +395,7 @@ function AccountingView() {
           <div className="space-y-2">
             {orders.slice(0, 20).map((order) => (
               <div key={order._id} className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-sm">
-                <div><p className="font-bold text-white">{order.paymentRef || String(order._id).slice(-8)}</p><p className="text-zinc-500">{order.recipientName || order.user?.name || "Guest"} | {formatVND(order.totalPrice)}</p></div>
+                <div><p className="font-bold text-fg">{order.paymentRef || String(order._id).slice(-8)}</p><p className="text-zinc-500">{order.recipientName || order.user?.name || "Guest"} | {formatVND(order.totalPrice)}</p></div>
                 <button disabled={invoicedOrderIds.has(order._id)} onClick={() => createFromOrder(order._id)} className="admin-button-secondary disabled:opacity-40">
                   {invoicedOrderIds.has(order._id) ? "Invoiced" : "Create"}
                 </button>
@@ -374,7 +408,7 @@ function AccountingView() {
             {invoices.map((invoice) => (
               <div key={invoice._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
                 <div className="flex items-center justify-between">
-                  <div><p className="font-bold text-white">{invoice.code}</p><p className="text-xs text-zinc-500">{invoice.customerName} | {invoice.status}</p></div>
+                  <div><p className="font-bold text-fg">{invoice.code}</p><p className="text-xs text-zinc-500">{invoice.customerName} | {invoice.status}</p></div>
                   {invoice.status !== "paid" && invoice.status !== "cancelled" ? <button onClick={() => markPaid(invoice._id)} className="admin-button-secondary">Mark paid</button> : null}
                 </div>
                 <p className="mt-2 text-sm text-red-300">{formatVND(invoice.totalAmount || 0)}</p>
@@ -389,7 +423,7 @@ function AccountingView() {
             <div key={order._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="font-bold text-white">{order.paymentRef || String(order._id).slice(-8)}</p>
+                  <p className="font-bold text-fg">{order.paymentRef || String(order._id).slice(-8)}</p>
                   <p className="text-xs text-zinc-500">{order.recipientName || order.user?.name || "Guest"} | {formatVND(order.totalPrice || 0)}</p>
                   <p className="text-xs text-amber-300">Refund status: {order.refundStatus || "none"}</p>
                 </div>
@@ -407,7 +441,7 @@ function AccountingView() {
           <div className="space-y-2">
             {accounts.map((account) => (
               <div key={account._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                <p className="font-bold text-white">{account.code} - {account.name}</p>
+                <p className="font-bold text-fg">{account.code} - {account.name}</p>
                 <p className="text-xs text-zinc-500">{account.type} | {account.active ? "active" : "inactive"}</p>
               </div>
             ))}
@@ -417,7 +451,7 @@ function AccountingView() {
           <div className="space-y-2">
             {entries.map((entry) => (
               <div key={entry._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
-                <p className="font-bold text-white">{entry.description || entry.refType}</p>
+                <p className="font-bold text-fg">{entry.description || entry.refType}</p>
                 <p className="text-xs text-zinc-500">{new Date(entry.date).toLocaleString("vi-VN")} | {entry.refType}:{entry.refId}</p>
                 <div className="mt-2 space-y-1">
                   {entry.lines?.map((line, idx) => (
@@ -461,7 +495,7 @@ function ApprovalsView() {
             <input className="admin-input" value={form.title} onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))} placeholder="Request title" required />
             <input className="admin-input" type="number" min="1" value={form.requiredApprovals} onChange={(e) => setForm((p) => ({ ...p, requiredApprovals: e.target.value }))} placeholder="Required approvals" />
             <textarea className="admin-input min-h-28 py-2" value={form.payload} onChange={(e) => setForm((p) => ({ ...p, payload: e.target.value }))} placeholder='Payload JSON, vd: {"orderId":"..."}' />
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Create</button>
           </form>
         </Panel>
         <Panel title="Approval queue">
@@ -470,7 +504,7 @@ function ApprovalsView() {
               <div key={a._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-bold text-white">{a.title}</p>
+                    <p className="font-bold text-fg">{a.title}</p>
                     <p className="text-xs text-zinc-500">{a.type} | {a.status} | {a.approvalSteps?.filter((s) => s.status === "approved").length || 0}/{a.requiredApprovals || 1}</p>
                   </div>
                   {a.status === "pending" ? <div className="flex gap-2"><button onClick={() => decide(a._id, "approved")} className="admin-button-secondary">Approve</button><button onClick={() => decide(a._id, "rejected")} className="admin-button-secondary">Reject</button></div> : null}
@@ -534,7 +568,7 @@ function ReportsView() {
             <tbody className="divide-y divide-zinc-800 text-zinc-300">
               {(trialBalance?.rows || []).map((row) => (
                 <tr key={row.accountId}>
-                  <td className="py-3 font-bold text-white">{row.code} - {row.name}</td>
+                  <td className="py-3 font-bold text-fg">{row.code} - {row.name}</td>
                   <td>{row.type}</td>
                   <td className="text-right">{formatVND(row.debit)}</td>
                   <td className="text-right">{formatVND(row.credit)}</td>
@@ -607,7 +641,7 @@ function SettingsView() {
             <select className="admin-input" value={form.role} onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}>
               {Object.entries(ROLE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
-            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-white hover:bg-red-500">Create account</button>
+            <button className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black uppercase text-on-accent hover:bg-red-500">Create account</button>
           </form>
           {message ? <p className="mt-2 text-xs text-cyan-300">{message}</p> : null}
         </Panel>
@@ -617,7 +651,7 @@ function SettingsView() {
               <div key={admin._id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-bold text-white">{admin.name} ({admin.username})</p>
+                    <p className="font-bold text-fg">{admin.name} ({admin.username})</p>
                     <p className="text-xs text-zinc-500">{admin.email} | {admin.phone || "-"}</p>
                     <p className="text-xs text-amber-300">{ROLE_LABELS[admin.role] || admin.role} · {admin.isBlocked ? "Blocked" : "Active"}</p>
                   </div>
@@ -645,14 +679,14 @@ function SimpleProductTable({ products, showValue = false }) {
       <table className="min-w-full text-sm">
         <thead className="text-left text-xs uppercase text-zinc-500"><tr><th className="py-3">Name</th><th>Category</th><th>Stock</th><th className="text-right">{showValue ? "Value" : "Price"}</th></tr></thead>
         <tbody className="divide-y divide-zinc-800 text-zinc-300">
-          {products.map((p) => <tr key={p._id}><td className="py-3 font-bold text-white">{p.name}</td><td>{p.category}</td><td>{p.stock}</td><td className="text-right text-red-300">{showValue ? formatVND((p.stock || 0) * (p.price || 0)) : formatVND(p.price)}</td></tr>)}
+          {products.map((p) => <tr key={p._id}><td className="py-3 font-bold text-fg">{p.name}</td><td>{p.category}</td><td>{p.stock}</td><td className="text-right text-red-300">{showValue ? formatVND((p.stock || 0) * (p.price || 0)) : formatVND(p.price)}</td></tr>)}
         </tbody>
       </table>
     </div>
   );
 }
 
-function PageHeader({ title, description }) { return (<header><h1 className="text-3xl font-black text-white">{title}</h1><p className="mt-1 text-sm text-zinc-400">{description}</p></header>); }
-function Panel({ title, children }) { return (<section className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4"><h2 className="mb-3 text-base font-black text-white">{title}</h2>{children}</section>); }
-function MetricCard({ label, value }) { return (<article className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4"><p className="text-xs uppercase text-zinc-500">{label}</p><p className="mt-2 text-2xl font-black text-red-300">{value}</p></article>); }
+function PageHeader({ title, description }) { return (<header><h1 className="text-3xl font-extrabold tracking-tight text-fg">{title}</h1><p className="mt-1 text-sm text-zinc-400">{description}</p></header>); }
+function Panel({ title, children }) { return (<section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5"><h2 className="mb-3 text-base font-bold text-fg">{title}</h2>{children}</section>); }
+function MetricCard({ label, value }) { return (<article className="rounded-2xl border border-zinc-800 bg-zinc-900 p-5"><p className="text-sm text-zinc-400">{label}</p><p className="mt-2 text-2xl font-extrabold text-fg">{value}</p></article>); }
 function formatVND(value) { return `${Number(value || 0).toLocaleString("vi-VN")}₫`; }

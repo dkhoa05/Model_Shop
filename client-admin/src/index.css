@@ -1,23 +1,161 @@
+@import "@fontsource/be-vietnam-pro/vietnamese-400.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-500.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-600.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-700.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-800.css";
+@import "@fontsource/be-vietnam-pro/latin-400.css";
+@import "@fontsource/be-vietnam-pro/latin-500.css";
+@import "@fontsource/be-vietnam-pro/latin-600.css";
+@import "@fontsource/be-vietnam-pro/latin-700.css";
+@import "@fontsource/be-vietnam-pro/latin-800.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-* {
-  box-sizing: border-box;
+/* Token: giống web khách. Chữ 400 trên nền >= 6.9:1, chữ 500 >= 4.9:1, nút nhấn 6.6:1. */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --z-50: 245 246 248;
+  --z-100: 233 236 241;
+  --z-200: 217 221 228;
+  --z-300: 192 197 206;
+  --z-400: 160 166 178;
+  --z-500: 128 135 148;
+  --z-600: 96 103 116;
+  --z-700: 52 57 67;
+  --z-800: 36 40 48;
+  --z-900: 22 25 31;
+  --z-950: 14 16 20;
+  --fg: 245 246 248;
+  --accent: 255 107 61;
+  --accent-strong: 214 78 36;
+  --accent-fg: 20 17 15;
+  --accent-text: 255 143 107;
+  --ok: 34 197 94;
+  --ok-text: 74 222 128;
+  --warn: 245 158 11;
+  --warn-text: 251 191 36;
+  --danger-text: 252 129 129;
 }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #07080b;
+[data-theme="light"] {
+  color-scheme: light;
+  --z-50: 14 16 20;
+  --z-100: 24 27 33;
+  --z-200: 38 42 50;
+  --z-300: 58 64 75;
+  --z-400: 78 85 98;
+  --z-500: 96 103 116;
+  --z-600: 120 127 140;
+  --z-700: 199 204 213;
+  --z-800: 224 227 233;
+  --z-900: 255 255 255;
+  --z-950: 245 246 248;
+  --fg: 14 16 20;
+  --accent: 255 107 61;
+  --accent-strong: 184 57 15;
+  --accent-fg: 20 17 15;
+  --accent-text: 184 57 15;
+  --ok: 21 128 61;
+  --ok-text: 21 128 61;
+  --warn: 180 83 9;
+  --warn-text: 146 84 7;
+  --danger-text: 185 28 28;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-zinc-950 font-sans text-fg antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+    text-wrap: balance;
+  }
+
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid rgb(var(--accent));
+    outline-offset: 3px;
+    border-radius: 0.5rem;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.85);
+    color: rgb(var(--accent-fg));
+  }
+
+  /* Vùng chạm tối thiểu cho điều khiển trong biểu mẫu/bảng */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select,
+  textarea {
+    min-height: 2.75rem;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--z-500));
+  }
 }
 
 @layer components {
   .admin-input {
-    @apply h-11 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-red-500;
+    @apply min-h-11 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm text-fg outline-none transition hover:border-zinc-600;
+  }
+
+  .admin-input:focus-visible {
+    @apply border-accent;
+    outline: 3px solid rgb(var(--accent) / 0.45);
+    outline-offset: 0;
   }
 
   .admin-button-secondary {
-    @apply rounded-xl border border-zinc-700 px-4 py-2 text-xs font-black uppercase text-zinc-200 transition hover:border-red-500 hover:text-red-300;
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-600 bg-transparent px-4 text-sm font-semibold text-fg transition hover:border-accent hover:text-accent-text disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .admin-button-primary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-xl bg-accent px-5 text-sm font-bold text-on-accent transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .admin-panel {
+    @apply rounded-2xl border border-zinc-800 bg-zinc-900 p-5;
   }
 }
 
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--z-950));
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--z-700));
+  border-radius: 999px;
+  border: 2px solid rgb(var(--z-950));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

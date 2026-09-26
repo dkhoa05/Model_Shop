@@ -38,59 +38,57 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#07080b] text-white">
-      <div className="fixed inset-0 bg-[linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] bg-[size:36px_36px]" />
-      <div className="fixed inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(220,38,38,0.2),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(34,211,238,0.14),transparent_32%)]" />
-      <section className="relative mx-auto grid min-h-screen max-w-6xl items-center gap-10 px-5 py-10 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="hidden lg:block">
-          <p className="text-xs font-black uppercase tracking-[0.28em] text-red-400">ModelShop Admin</p>
-          <h1 className="mt-5 text-5xl font-black uppercase leading-tight">
-            Điều hành shop mô hình từ một dashboard.
-          </h1>
-          <p className="mt-5 max-w-xl text-base leading-7 text-zinc-400">
-            Quản lý sản phẩm, đơn hàng, khách hàng, tồn kho, CRM và báo cáo doanh thu bằng dữ liệu thật từ MongoDB API.
+    <main className="min-h-screen bg-zinc-950 text-fg">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-6">
+        <div className="flex items-center justify-between">
+          <p className="text-xl font-extrabold tracking-tight">
+            Model<span className="text-accent-text">Shop</span> <span className="font-semibold text-zinc-400">Quản trị</span>
           </p>
-          <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-            {["Sales", "Inventory", "CRM"].map((item) => (
-              <div key={item} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
-                <p className="text-sm font-black text-cyan-200">{item}</p>
-                <p className="mt-2 text-xs text-zinc-500">Realtime API</p>
-              </div>
-            ))}
-          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="relative rounded-3xl border border-zinc-800 bg-zinc-950/90 p-6 shadow-2xl shadow-red-950/20 sm:p-8">
-          <div className="mb-8">
-            <div className="mb-4 grid h-12 w-12 place-items-center rounded-xl border border-red-500/30 bg-red-500/10 text-xl font-black text-red-300">M</div>
-            <h2 className="text-2xl font-black uppercase">Đăng nhập admin</h2>
-            <p className="mt-2 text-sm text-zinc-500">Dùng tài khoản admin để vào dashboard vận hành.</p>
+        <div className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="hidden lg:block">
+            <h1 className="max-w-xl text-5xl font-extrabold leading-tight tracking-tight">Điều hành cửa hàng từ một nơi</h1>
+            <p className="mt-5 max-w-lg text-lg leading-8 text-zinc-400">Sản phẩm, đơn hàng, kho, mua hàng, kế toán và báo cáo, theo đúng quyền của từng vai trò.</p>
           </div>
 
-          <label className="grid gap-2 text-sm font-bold text-zinc-300">
-            Tài khoản hoặc email
-            <input className="admin-input" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="admin@example.com" required />
-          </label>
+          <form onSubmit={handleSubmit} className="rounded-[28px] border border-zinc-800 bg-zinc-900 p-6 sm:p-8" aria-labelledby="login-title">
+            <h2 id="login-title" className="text-2xl font-extrabold tracking-tight">
+              Đăng nhập
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400">Dùng tài khoản nội bộ (admin, nhân viên hoặc kế toán).</p>
 
-          <label className="mt-4 grid gap-2 text-sm font-bold text-zinc-300">
-            Mật khẩu
-            <div className="relative">
-              <input className="admin-input pr-20" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="••••••••" required />
-              <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-black text-cyan-300">
-                {showPassword ? "Ẩn" : "Hiện"}
-              </button>
+            {error && (
+              <p role="alert" className="mt-5 rounded-xl border border-red-500/60 bg-red-500/10 p-3 text-sm font-medium text-fg">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-6 grid gap-2">
+              <label htmlFor="identifier" className="text-sm font-semibold text-zinc-200">
+                Email hoặc tên đăng nhập
+              </label>
+              <input id="identifier" className="admin-input" value={identifier} onChange={(event) => setIdentifier(event.target.value)} autoComplete="username" required />
             </div>
-          </label>
 
-          {error && <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-200">{error}</p>}
+            <div className="mt-4 grid gap-2">
+              <label htmlFor="password" className="text-sm font-semibold text-zinc-200">
+                Mật khẩu
+              </label>
+              <input id="password" className="admin-input" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" required />
+            </div>
 
-          <button disabled={loading} className="mt-6 h-12 w-full rounded-xl bg-red-600 text-sm font-black uppercase text-white transition hover:bg-red-500 disabled:cursor-wait disabled:opacity-70">
-            {loading ? "Đang đăng nhập..." : "Vào dashboard"}
-          </button>
+            <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-zinc-300">
+              <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)} className="h-5 w-5" style={{ accentColor: "rgb(var(--accent))" }} />
+              Hiện mật khẩu
+            </label>
 
-          <p className="mt-5 text-center text-xs text-zinc-500">API: {import.meta.env.VITE_API_BASE || "http://localhost:5000/api"}</p>
-        </form>
-      </section>
+            <button disabled={loading} className="admin-button-primary mt-4 w-full">
+              {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+            </button>
+          </form>
+        </div>
+      </div>
     </main>
   );
 }
