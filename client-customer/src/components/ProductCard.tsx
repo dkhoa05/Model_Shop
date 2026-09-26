@@ -1,94 +1,115 @@
 "use client";
 
 import Link from "next/link";
-import { Check, Heart, ShoppingCart, Star } from "lucide-react";
-import { useState } from "react";
+import { Check, Heart, ShoppingBag, Star } from "lucide-react";
+import { PointerEvent, useState } from "react";
 import { Product } from "@/types/product";
 import { useCart } from "@/context/CartContext";
 import { formatVND } from "@/utils/currency";
 import Badge from "./Badge";
 import ProductImage from "./ProductImage";
 
+/** Thẻ sản phẩm: toàn thẻ bấm được (liên kết ở tên), nút giỏ/yêu thích tách riêng, đủ vùng chạm 44px */
 export default function ProductCard({ product, rank }: { product: Product; rank?: number }) {
   const { addToCart, toggleWishlist, isInWishlist } = useCart();
   const [added, setAdded] = useState(false);
   const favorited = isInWishlist(product.id);
-  const disabled = product.status === "out-of-stock";
+  const soldOut = product.status === "out-of-stock";
+  const preOrder = product.status === "pre-order";
+  const discount = product.originalPrice && product.originalPrice > product.price ? Math.round((1 - product.price / product.originalPrice) * 100) : 0;
 
   const handleAdd = () => {
     addToCart(product);
     setAdded(true);
-    window.setTimeout(() => setAdded(false), 1400);
+    window.setTimeout(() => setAdded(false), 1600);
+  };
+
+  // Ánh sáng theo con trỏ: chỉ đặt biến CSS, không setState
+  const onMove = (e: PointerEvent<HTMLElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
   };
 
   return (
-    <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/90 transition duration-300 hover:-translate-y-1 hover:border-red-500/40">
-      <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
-        {product.badge && <Badge text={product.badge.text} type={product.badge.type} />}
-        {rank && <span className="rounded-md bg-zinc-950/80 px-2 py-1 text-[10px] font-black text-cyan-300">#{rank}</span>}
+    <article
+      onPointerMove={onMove}
+      className="spotlight group relative flex h-full flex-col overflow-hidden rounded-[20px] border border-zinc-800 bg-zinc-900 transition duration-300 hover:-translate-y-1 hover:border-zinc-600 hover:shadow-card"
+    >
+      <div className="relative aspect-square overflow-hidden bg-zinc-800">
+        <ProductImage
+          src={product.images[0]}
+          alt=""
+          sizes="(min-width: 1280px) 20vw, (min-width: 768px) 33vw, 50vw"
+          className={`object-cover transition duration-700 group-hover:scale-105 ${soldOut ? "opacity-50 grayscale" : ""}`}
+        />
+        <div className="absolute left-3 top-3 z-10 flex flex-col items-start gap-1.5">
+          {product.badge && <Badge text={product.badge.text} type={product.badge.type} />}
+          {discount > 0 && <span className="rounded-md bg-accent px-2 py-1 text-[11px] font-extrabold leading-none text-on-accent">-{discount}%</span>}
+          {rank && <span className="rounded-md bg-zinc-950/85 px-2 py-1 text-[11px] font-extrabold leading-none text-fg backdrop-blur">Top {rank}</span>}
+        </div>
+        {soldOut && (
+          <span className="absolute inset-x-0 bottom-3 mx-auto w-fit rounded-full bg-zinc-950/90 px-3 py-1.5 text-xs font-bold text-fg">Tạm hết hàng</span>
+        )}
       </div>
 
       <button
         type="button"
         onClick={() => toggleWishlist(product.id)}
-        className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-xl border border-zinc-800 bg-zinc-950/80 text-zinc-300 backdrop-blur transition hover:border-red-500/40 hover:text-red-400"
-        aria-label="Thêm vào wishlist"
+        aria-pressed={favorited}
+        aria-label={favorited ? `Bỏ ${product.name} khỏi yêu thích` : `Thêm ${product.name} vào yêu thích`}
+        className="absolute right-2 top-2 z-20 grid h-11 w-11 place-items-center rounded-xl bg-zinc-950/70 text-zinc-200 backdrop-blur transition hover:bg-zinc-950 hover:text-accent-text"
       >
-        <Heart size={16} className={favorited ? "fill-red-500 text-red-500" : ""} />
+        <Heart size={18} aria-hidden className={favorited ? "fill-accent text-accent" : ""} />
       </button>
 
-      <Link href={`/products/${product.slug}`} className="relative block aspect-square overflow-hidden bg-zinc-950">
-        <ProductImage
-          src={product.images[0]}
-          alt={`${product.name} chính hãng tại ModelShop`}
-          sizes="(min-width: 1280px) 20vw, (min-width: 640px) 33vw, 50vw"
-          className="object-cover opacity-90 transition duration-700 group-hover:scale-105 group-hover:opacity-100"
-        />
-      </Link>
-
       <div className="flex flex-1 flex-col p-4">
-        <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-black uppercase tracking-wide text-zinc-500">
-          <span>{product.brand}</span>
-          <span className="text-cyan-400">{product.grade || product.category}</span>
-        </div>
-
-        <h3 className="line-clamp-2 min-h-11 text-sm font-bold leading-5 text-white">
-          <Link href={`/products/${product.slug}`} className="hover:text-red-400">
+        <p className="text-xs font-semibold text-zinc-400">
+          {product.brand}
+          {product.grade ? ` · ${product.grade}` : ""}
+        </p>
+        <h3 className="mt-1.5 line-clamp-2 min-h-[2.75rem] text-[15px] font-bold leading-snug text-fg">
+          <Link href={`/products/${product.slug}`} className="stretched-link rounded">
             {product.name}
           </Link>
         </h3>
 
-        <div className="mt-3 flex items-center gap-1.5">
-          <span className="flex text-amber-400">
-            {Array.from({ length: 5 }).map((_, index) => (
-              <Star key={index} size={13} className={index < Math.round(product.rating) ? "fill-amber-400" : "opacity-25"} />
-            ))}
-          </span>
-          <span className="text-xs font-bold text-zinc-500">({product.reviewCount})</span>
-        </div>
+        <p className="mt-2 flex items-center gap-1.5 text-xs text-zinc-400">
+          {product.reviewCount > 0 ? (
+            <>
+              <Star size={14} className="fill-amber-400 text-amber-400" aria-hidden />
+              <span className="font-semibold text-zinc-200">{product.rating.toFixed(1)}</span>
+              <span>({product.reviewCount})</span>
+              <span className="sr-only">{`đánh giá trung bình ${product.rating.toFixed(1)} trên 5 từ ${product.reviewCount} lượt`}</span>
+            </>
+          ) : (
+            <span>Chưa có đánh giá</span>
+          )}
+        </p>
 
-        <div className="mt-4 flex flex-wrap items-baseline gap-2">
-          <span className="text-lg font-black text-red-400">{formatVND(product.price)}</span>
-          {product.originalPrice && <span className="text-xs font-bold text-zinc-500 line-through">{formatVND(product.originalPrice)}</span>}
+        <div className="mt-3 flex flex-wrap items-baseline gap-x-2">
+          <span className="text-lg font-extrabold text-fg">{formatVND(product.price)}</span>
+          {product.originalPrice && <span className="text-sm text-zinc-500 line-through">{formatVND(product.originalPrice)}</span>}
         </div>
 
         <button
           type="button"
           onClick={handleAdd}
-          disabled={disabled}
-          className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-red-600/50 bg-zinc-950 px-3 text-xs font-black uppercase tracking-wide text-red-400 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:border-zinc-700 disabled:text-zinc-500 disabled:hover:bg-zinc-950"
+          disabled={soldOut}
+          className={`relative z-20 mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-bold transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+            added ? "border-transparent bg-emerald-500 text-on-accent" : "border-zinc-700 bg-zinc-800 text-fg hover:border-accent hover:bg-accent hover:text-on-accent"
+          }`}
         >
-          {disabled ? (
+          {soldOut ? (
             "Hết hàng"
           ) : added ? (
             <>
-              <Check size={15} />
-              Đã thêm
+              <Check size={17} aria-hidden /> Đã thêm
             </>
           ) : (
             <>
-              <ShoppingCart size={15} />
-              {product.status === "pre-order" ? "Đặt trước" : "Thêm vào giỏ"}
+              <ShoppingBag size={17} aria-hidden />
+              {preOrder ? "Đặt trước" : "Thêm vào giỏ"}
             </>
           )}
         </button>

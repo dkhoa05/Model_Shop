@@ -1,74 +1,103 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
-import { banners } from "@/data/banners";
+import Link from "next/link";
+import { useRef } from "react";
+import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { ArrowRight, PackageCheck, ShieldCheck, Truck } from "lucide-react";
 import Button from "./Button";
+import ProductImage from "./ProductImage";
+import type { Product } from "@/types/product";
+import { formatVND } from "@/utils/currency";
 
-export default function HeroSection() {
-  const [active, setActive] = useState(0);
+const HERO_IMAGE = "https://images.unsplash.com/photo-1612400200701-847d015ba101?auto=format&fit=crop&q=85&w=1600";
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setActive((current) => (current + 1) % banners.length), 6500);
-    return () => window.clearInterval(timer);
-  }, []);
+/** Hero: thông điệp bên trái, ảnh + 2 sản phẩm thật bên phải; ảnh trượt nhẹ theo cuộn (tắt khi giảm chuyển động) */
+export default function HeroSection({ spotlight = [] }: { spotlight?: Product[] }) {
+  const ref = useRef<HTMLElement>(null);
+  const reduce = useReducedMotion();
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end start"] });
+  const imageY = useTransform(scrollYProgress, [0, 1], reduce ? ["0%", "0%"] : ["0%", "14%"]);
+  const cardsY = useTransform(scrollYProgress, [0, 1], reduce ? [0, 0] : [0, -36]);
 
-  const banner = banners[active];
+  const stagger = (i: number) => ({
+    initial: reduce ? false : ({ opacity: 0, y: 28 } as const),
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.7, delay: 0.08 * i, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }
+  });
 
   return (
-    <section className="relative min-h-[620px] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950">
-      {banners.map((item, index) => (
-        <div key={item.id} className={`absolute inset-0 transition duration-700 ${index === active ? "opacity-100" : "opacity-0"}`}>
-          <img src={item.image} alt={item.title} className="hero-kenburns h-full w-full object-cover opacity-55" />
-          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/88 to-zinc-950/25" />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
-        </div>
-      ))}
+    <section ref={ref} className="relative isolate overflow-hidden border-b border-zinc-800/70" aria-labelledby="hero-title">
+      <div className="hero-grid pointer-events-none absolute inset-0 -z-10" aria-hidden />
+      <div className="pointer-events-none absolute -left-32 top-0 -z-10 h-[28rem] w-[28rem] rounded-full bg-accent/15 blur-3xl" aria-hidden />
 
-      <div className="relative z-10 grid min-h-[620px] items-center gap-8 px-6 py-16 sm:px-10 lg:grid-cols-[1fr_440px] lg:px-16 2xl:px-24">
-        <div className="max-w-4xl">
-          <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-black uppercase tracking-[0.24em] text-red-300">
-            <Sparkles size={13} />
-            {banner.eyebrow}
-          </p>
-          <h1 className="font-space-grotesk text-4xl font-black uppercase leading-none tracking-tight text-white sm:text-5xl lg:text-7xl">
-            {banner.title}
-          </h1>
-          <p className="mt-5 max-w-2xl text-lg font-bold text-cyan-100">{banner.subtitle}</p>
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-zinc-300 sm:text-base">{banner.description}</p>
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button href={banner.primaryHref}>
-              <ShoppingBag size={17} />
-              Mua ngay
+      <div className="container-page grid lg:min-h-[min(46rem,calc(100dvh-4rem))] items-center gap-10 py-12 lg:grid-cols-[1.05fr_0.95fr] lg:py-16">
+        <div className="max-w-2xl">
+          <motion.h1 {...stagger(0)} id="hero-title" className="text-4xl font-extrabold leading-[1.08] tracking-tight text-fg sm:text-5xl lg:text-6xl">
+            Gunpla và figure chính hãng cho người sưu tầm
+          </motion.h1>
+          <motion.p {...stagger(1)} className="mt-5 max-w-xl text-lg leading-8 text-zinc-300">
+            Bandai, Kotobukiya, Megahouse. Kiểm tra box trước khi giao, đóng gói chống sốc, hỗ trợ đặt trước.
+          </motion.p>
+          <motion.div {...stagger(2)} className="mt-8 flex flex-wrap gap-3">
+            <Button href="/products">
+              Xem sản phẩm
+              <ArrowRight size={18} aria-hidden />
             </Button>
-            <Button href={banner.secondaryHref} variant="outline">
-              Xem pre-order
+            <Button href="/products?status=pre-order" variant="outline">
+              Đặt trước
             </Button>
-          </div>
-        </div>
-
-        <div className="hidden rounded-3xl border border-white/10 bg-white/[0.05] p-5 backdrop-blur-xl lg:block">
-          <div className="aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-950">
-            <img src={banner.image} alt={`${banner.title} preview`} className="h-full w-full object-cover product-shadow" />
-          </div>
-          <div className="mt-5 grid gap-3">
-            {["Chính hãng", "Đóng gói chống sốc", "Hỗ trợ pre-order"].map((item) => (
-              <span key={item} className="inline-flex items-center gap-2 text-sm font-bold text-zinc-200">
-                <ShieldCheck size={16} className="text-red-400" />
-                {item}
-              </span>
+          </motion.div>
+          <motion.ul {...stagger(3)} className="mt-10 grid gap-3 text-sm font-medium text-zinc-300 sm:grid-cols-3" aria-label="Cam kết của cửa hàng">
+            {[
+              { icon: ShieldCheck, text: "Hàng chính hãng" },
+              { icon: PackageCheck, text: "Đóng gói chống sốc" },
+              { icon: Truck, text: "Giao nhanh toàn quốc" }
+            ].map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-2.5">
+                <Icon size={18} className="shrink-0 text-accent-text" aria-hidden />
+                {text}
+              </li>
             ))}
-          </div>
+          </motion.ul>
         </div>
-      </div>
 
-      <div className="absolute bottom-6 right-6 z-20 flex gap-2">
-        <button className="grid h-11 w-11 place-items-center rounded-xl border border-zinc-700 bg-zinc-950/80 text-white backdrop-blur hover:border-red-500" onClick={() => setActive((active - 1 + banners.length) % banners.length)} aria-label="Banner trước">
-          <ChevronLeft size={18} />
-        </button>
-        <button className="grid h-11 w-11 place-items-center rounded-xl border border-zinc-700 bg-zinc-950/80 text-white backdrop-blur hover:border-red-500" onClick={() => setActive((active + 1) % banners.length)} aria-label="Banner sau">
-          <ChevronRight size={18} />
-        </button>
+        <div className="relative mx-auto w-full max-w-xl lg:max-w-none">
+          <motion.div
+            initial={reduce ? false : { opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+            className="relative aspect-[4/5] overflow-hidden rounded-[28px] border border-zinc-800 bg-zinc-900 shadow-pop sm:aspect-[5/4] lg:aspect-[4/5]"
+          >
+            <motion.div style={{ y: imageY }} className="absolute inset-[-8%]">
+              <ProductImage src={HERO_IMAGE} alt="Mô hình Gundam lắp sẵn trên kệ trưng bày" sizes="(min-width: 1024px) 45vw, 100vw" className="object-cover" priority />
+            </motion.div>
+            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/70 via-transparent to-transparent" aria-hidden />
+          </motion.div>
+
+          {spotlight.slice(0, 2).map((product, i) => (
+            <motion.div
+              key={product.id}
+              style={{ y: cardsY }}
+              initial={reduce ? false : { opacity: 0, x: i === 0 ? -24 : 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.5 + i * 0.12, ease: [0.16, 1, 0.3, 1] }}
+              className={`absolute w-56 sm:w-64 ${i === 0 ? "-bottom-6 left-3 sm:-left-6" : "right-3 top-8 sm:-right-4 sm:top-14"}`}
+            >
+              <Link
+                href={`/products/${product.slug}`}
+                className="flex items-center gap-3 rounded-2xl border border-zinc-700 bg-zinc-900/90 p-3 shadow-pop backdrop-blur-xl transition hover:-translate-y-1 hover:border-accent"
+              >
+                <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
+                  <ProductImage src={product.images[0]} alt="" sizes="56px" className="object-cover" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-bold text-fg">{product.name}</span>
+                  <span className="mt-0.5 block text-sm font-extrabold text-accent-text">{formatVND(product.price)}</span>
+                </span>
+              </Link>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </section>
   );

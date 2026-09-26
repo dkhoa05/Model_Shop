@@ -15,10 +15,12 @@ export default function ProductGrid({ products, ranked = false }: { products: Pr
   }
 
   return (
-    <div className="mx-auto grid max-w-[1440px] grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 lg:gap-5">
+    <ul className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {products.map((product, index) => (
-        <ProductCard key={product.id} product={product} rank={ranked ? index + 1 : undefined} />
+        <li key={product.id}>
+          <ProductCard product={product} rank={ranked ? index + 1 : undefined} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
