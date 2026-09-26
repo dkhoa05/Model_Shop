@@ -153,7 +153,7 @@ export default function Header() {
                   key={link.label}
                   href={link.href}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${
                     active ? "bg-zinc-800 text-fg" : "text-zinc-300 hover:bg-zinc-800/70 hover:text-fg"
                   }`}
                 >
@@ -163,7 +163,7 @@ export default function Header() {
             })}
           </nav>
 
-          <form onSubmit={handleSearch} role="search" className="relative ml-auto hidden w-64 md:block xl:w-96">
+          <form onSubmit={handleSearch} role="search" className="relative ml-auto hidden w-56 md:block lg:w-52 xl:w-72 2xl:w-96">
             <label htmlFor="site-search" className="sr-only">
               Tìm kiếm sản phẩm
             </label>
