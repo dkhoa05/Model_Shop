@@ -157,3 +157,19 @@ test("cấu hình checkout công khai khớp phí ship server dùng để tính 
   assert.equal(pickup.json.shippingFee, 0);
   assert.equal(pickup.json.address, cfg.json.pickupAddress);
 });
+
+test("đơn nhiều sản phẩm (nhiều dòng) đặt và hủy được trong transaction", async () => {
+  const a = await Product.create({ name: "Multi A", price: 100000, category: "HG", stock: 5 });
+  const b = await Product.create({ name: "Multi B", price: 200000, category: "HG", stock: 5 });
+  const o = await call("POST", "/orders", {
+    cookie: userCookie,
+    body: { ...addr, items: [{ product: String(a._id), quantity: 2 }, { product: String(b._id), quantity: 1 }] }
+  });
+  assert.equal(o.status, 201, JSON.stringify(o.json));
+  assert.equal(o.json.items.length, 2);
+  assert.equal((await Product.findById(a._id)).stock, 3);
+  assert.equal((await Product.findById(b._id)).stock, 4);
+  assert.equal((await call("POST", `/orders/${o.json._id}/cancel`, { cookie: userCookie, body: {} })).status, 200);
+  assert.equal((await Product.findById(a._id)).stock, 5);
+  assert.equal((await Product.findById(b._id)).stock, 5);
+});

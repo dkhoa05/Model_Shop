@@ -387,7 +387,7 @@ router.post("/", optionalAuth, async (req, res) => {
             refId: String(created._id),
             createdBy: req.user?._id || null
           })),
-          opt
+          { ...opt, ordered: true } // nhiều document + session bắt buộc ordered: true
         );
         return created;
       } catch (err) {
