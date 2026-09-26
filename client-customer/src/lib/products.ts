@@ -21,10 +21,10 @@ export type ApiProduct = {
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 export const sortOptions = [
-  { label: "Newest", value: "newest" },
-  { label: "Price Low to High", value: "price-asc" },
-  { label: "Price High to Low", value: "price-desc" },
-  { label: "Best Seller", value: "best-seller" }
+  { label: "Mới nhất", value: "newest" },
+  { label: "Giá thấp đến cao", value: "price-asc" },
+  { label: "Giá cao đến thấp", value: "price-desc" },
+  { label: "Bán chạy", value: "best-seller" }
 ] as const;
 
 export const productFilterGroups = [

@@ -3,27 +3,34 @@
 import { useState } from "react";
 import ProductImage from "./ProductImage";
 
+/** Thư viện ảnh: ảnh lớn + dải ảnh nhỏ là các nút có nhãn và aria-pressed (điều hướng được bằng bàn phím) */
 export default function ProductGallery({ images, productName }: { images: string[]; productName: string }) {
-  const safeImages = images.length > 0 ? images : ["https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?auto=format&fit=crop&q=85&w=1200"];
-  const [active, setActive] = useState(safeImages[0]);
+  const safeImages = images.length > 0 ? images : [""];
+  const [index, setIndex] = useState(0);
+  const active = safeImages[Math.min(index, safeImages.length - 1)];
 
   return (
     <div className="grid gap-4">
-      <div className="relative aspect-square overflow-hidden bg-apple-parchment">
-        <ProductImage src={active} alt={`${productName} product gallery`} sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover product-shadow" priority />
+      <div className="relative aspect-square overflow-hidden rounded-[24px] border border-zinc-800 bg-zinc-900">
+        <ProductImage src={active} alt={`${productName}, ảnh ${index + 1} trên ${safeImages.length}`} sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" priority />
       </div>
-      <div className="grid grid-cols-4 gap-3">
-        {safeImages.map((image, index) => (
-          <button
-            key={image}
-            type="button"
-            className={`relative aspect-square overflow-hidden rounded-[18px] border bg-white ${active === image ? "border-apple-blue" : "border-apple-hairline"}`}
-            onClick={() => setActive(image)}
-          >
-            <ProductImage src={image} alt={`${productName} thumbnail ${index + 1}`} sizes="120px" className="object-cover" />
-          </button>
-        ))}
-      </div>
+      {safeImages.length > 1 && (
+        <ul className="grid grid-cols-5 gap-3" aria-label="Ảnh sản phẩm">
+          {safeImages.map((image, i) => (
+            <li key={`${image}-${i}`}>
+              <button
+                type="button"
+                onClick={() => setIndex(i)}
+                aria-label={`Xem ảnh ${i + 1}`}
+                aria-pressed={i === index}
+                className={`relative block aspect-square w-full overflow-hidden rounded-xl border-2 bg-zinc-900 transition ${i === index ? "border-accent" : "border-zinc-800 hover:border-zinc-600"}`}
+              >
+                <ProductImage src={image} alt="" sizes="120px" className="object-cover" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
