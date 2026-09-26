@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 import { connectDB } from "./config/db.js";
 import { User } from "./models/User.js";
 import { Product } from "./models/Product.js";
@@ -9,6 +10,9 @@ import { Order } from "./models/Order.js";
 import { PaymentConfig } from "./models/PaymentConfig.js";
 import { Expense } from "./models/Expense.js";
 import { Coupon } from "./models/Coupon.js";
+import { Invoice } from "./models/Invoice.js";
+import { JournalEntry } from "./models/JournalEntry.js";
+import { syncOrderAccounting } from "./services/accounting.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
@@ -25,8 +29,8 @@ const IMAGE_BY_CATEGORY = {
   Marvel: "https://images.unsplash.com/photo-1525182008055-f88b95ff7980?w=800",
   DC: "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800",
   Pokemon: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=800",
-  Vocaloid: "https://images.unsplash.com/photo-1520975693411-b8d238b3b3b4?w=800",
-  "Cute Figure": "https://images.unsplash.com/photo-1559266271-9a3f7f39b4c5?w=800",
+  Vocaloid: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
+  "Cute Figure": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
   Manga: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
   Collectible: "https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=800",
   Diorama: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800",
@@ -36,12 +40,12 @@ function getImageUrlByCategory(category) {
   return IMAGE_BY_CATEGORY[category] || IMAGE_BY_CATEGORY.Figure;
 }
 
-const run = async () => {
+export const runSeed = async ({ exit = true } = {}) => {
   if (process.env.NODE_ENV === "production" && process.env.ALLOW_SEED_IN_PRODUCTION !== "yes") {
     console.error("Từ chối chạy seed ở production (seed xóa/ghi đè dữ liệu). Đặt ALLOW_SEED_IN_PRODUCTION=yes nếu thật sự cần.");
     process.exit(1);
   }
-  await connectDB();
+  if (mongoose.connection.readyState !== 1) await connectDB();
 
   const adminEmail = "admin@modelshop.com";
   const adminPassword = process.env.SEED_PASSWORD || "Admin@123"; // chỉ dùng cho dev/local
@@ -64,7 +68,20 @@ const run = async () => {
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
+  for (const [role, email, name] of [
+    ["staff", "staff1@modelshop.com", "Nhân viên bán hàng"],
+    ["accountant", "accountant1@modelshop.com", "Kế toán"]
+  ]) {
+    await User.findOneAndUpdate(
+      { email },
+      { name, username: email.split("@")[0], email, password: hashed, role },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+  }
+
   await Product.deleteMany({});
+  await Invoice.deleteMany({});
+  await JournalEntry.deleteMany({});
 
   const baseProducts = [
     {
@@ -120,7 +137,8 @@ const run = async () => {
     ...p,
     images: [getImageUrlByCategory(p.category)],
     variantLabel: p.variantLabel || "",
-    availability: p.availability || "in_stock"
+    availability: p.availability || "in_stock",
+    cost: p.cost ?? Math.round((p.price || 0) * 0.6)
   }));
 
   const extraProducts = [
@@ -446,7 +464,10 @@ const run = async () => {
     availability: p.availability || "in_stock"
   }));
 
-  const allProducts = await Product.insertMany([...baseProducts, ...extraProducts]);
+  let allProducts = await Product.insertMany([...baseProducts, ...extraProducts]);
+  // Giá vốn mẫu = 60% giá bán (để báo cáo lợi nhuận có số liệu)
+  await Product.updateMany({ cost: 0 }, [{ $set: { cost: { $round: [{ $multiply: ["$price", 0.6] }, 0] } } }]);
+  allProducts = await Product.find();
 
   await Order.deleteMany({});
   await Expense.deleteMany({});
@@ -559,9 +580,10 @@ const run = async () => {
     { title: "Nhập hàng bổ sung", amount: 2100000, category: "Nhập hàng", expenseDate: makeDate(3) }
   ]);
 
+  // Thông tin nhận tiền DEMO để thử luồng chuyển khoản/ví; hãy thay bằng thông tin thật trong Admin → Payment Config
   await PaymentConfig.findOneAndUpdate(
     {},
-    {},
+    { $set: { bankName: "Vietcombank (demo)", bankAccount: "0123456789", accountHolder: "MODEL SHOP DEMO", momoPhone: "0900000000" } },
     { upsert: true, new: true }
   );
 
@@ -596,14 +618,23 @@ const run = async () => {
     { upsert: true }
   );
 
+  // Ghi sổ kế toán cho các đơn mẫu đã giao (doanh thu, giá vốn, thu tiền) và chi phí mẫu
+  const delivered = await Order.find({ status: "delivered" }).select("_id");
+  for (const o of delivered) await syncOrderAccounting(o._id, admin._id);
+  const { syncExpenseJournal } = await import("./services/accounting.js");
+  for (const e of await Expense.find()) await syncExpenseJournal(e, admin._id);
+
   console.log("Seed done.");
   console.log(`Admin login: ${adminEmail} / ${adminPassword}`);
-  console.log("Sample users: user1@modelshop.com / Admin@123, user2@modelshop.com / Admin@123");
-  process.exit(0);
+  console.log("Staff: staff1@modelshop.com, Accountant: accountant1@modelshop.com, Customers: user1@modelshop.com, user2@modelshop.com — mật khẩu như Admin");
+  if (exit) process.exit(0);
 };
 
-run().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Chạy trực tiếp: node src/seed.js
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  runSeed().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
 

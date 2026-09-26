@@ -7,6 +7,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed": "node src/seed.js",
+    "demo": "node scripts/demo.js",
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "ensure-admin": "node src/ensureAdmin.js"
   },

@@ -8,6 +8,7 @@
     "client-admin"
   ],
   "scripts": {
+    "demo": "npm run demo --workspace server",
     "dev:server": "nodemon server/src/server.js",
     "start:server": "node server/src/server.js",
     "dev:customer": "npm run dev --workspace client-customer",
