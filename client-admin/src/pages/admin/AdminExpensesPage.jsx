@@ -109,7 +109,7 @@ export default function AdminExpensesPage() {
   return (
     <div className="grid lg:grid-cols-[1.1fr,2fr] gap-6">
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Khoản chi</h2>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Khoản chi</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Nhập chi phí nhập hàng, vận hành… để lên báo cáo thu–chi/lãi lỗ.
         </p>
@@ -165,7 +165,7 @@ export default function AdminExpensesPage() {
                 "px-4 py-2 rounded-xl text-sm font-semibold transition " +
                 (theme === "dark"
                   ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-                  : "bg-rose-600 text-white hover:bg-rose-700")
+                  : "bg-rose-600 text-on-accent hover:bg-rose-700")
               }
             >
               {editing?._id ? "Lưu thay đổi" : "Thêm khoản chi"}
@@ -191,7 +191,7 @@ export default function AdminExpensesPage() {
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Danh sách khoản chi</h3>
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Danh sách khoản chi</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Tổng: <span className="font-semibold">{items.length}</span> • Tổng tiền:{" "}
               <span className="font-semibold text-rose-600 dark:text-cyan-400">{total.toLocaleString("vi-VN")} ₫</span>

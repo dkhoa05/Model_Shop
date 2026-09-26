@@ -111,9 +111,9 @@ export default function AdminReportsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
           Báo cáo doanh thu
-        </h2>
+        </h1>
         <button
           onClick={fetchReport}
           className={
@@ -165,7 +165,7 @@ export default function AdminReportsPage() {
             onClick={fetchReport}
             className={
               "px-4 py-2 rounded-xl text-sm font-semibold transition " +
-              (theme === "dark" ? "bg-cyan-600 text-white hover:bg-cyan-500" : "bg-rose-600 text-white hover:bg-rose-700")
+              (theme === "dark" ? "bg-cyan-600 text-on-accent hover:bg-cyan-500" : "bg-rose-600 text-on-accent hover:bg-rose-700")
             }
           >
             Áp dụng

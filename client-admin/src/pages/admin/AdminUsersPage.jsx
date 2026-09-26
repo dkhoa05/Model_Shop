@@ -170,7 +170,7 @@ export default function AdminUsersPage() {
   return (
     <div className="grid lg:grid-cols-[1.1fr,2fr] gap-6">
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Khách hàng</h2>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Khách hàng</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Thêm / sửa / xóa / chặn tài khoản khách.
         </p>
@@ -320,9 +320,9 @@ export default function AdminUsersPage() {
       <div className="space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
               Danh sách khách hàng
-            </h3>
+            </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Tổng: <span className="font-semibold">{users.length}</span>
             </p>

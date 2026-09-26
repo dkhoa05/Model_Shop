@@ -129,9 +129,9 @@ export default function AdminPaymentConfigPage() {
         <span aria-hidden="true">/</span>
         <span className="text-slate-600 dark:text-slate-300">Cấu hình thanh toán</span>
       </nav>
-      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
         Cấu hình thanh toán
-      </h2>
+      </h1>
       <p className="text-sm text-slate-600 dark:text-slate-400">
         Nhập số tài khoản ngân hàng, ảnh mã QR chuyển khoản và số điện thoại ví MoMo/ZaloPay. Nội dung này sẽ hiển thị cho khách khi thanh toán đơn hàng.
       </p>
@@ -283,8 +283,8 @@ export default function AdminPaymentConfigPage() {
             className={
               "px-4 py-2 rounded-xl text-sm font-semibold transition disabled:opacity-50 " +
               (theme === "dark"
-                ? "bg-cyan-600 text-white hover:bg-cyan-500"
-                : "bg-rose-600 text-white hover:bg-rose-700")
+                ? "bg-cyan-600 text-on-accent hover:bg-cyan-500"
+                : "bg-rose-600 text-on-accent hover:bg-rose-700")
             }
           >
             {saving ? "Đang lưu..." : "Lưu cấu hình"}

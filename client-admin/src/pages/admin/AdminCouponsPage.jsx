@@ -148,7 +148,7 @@ export default function AdminCouponsPage() {
   return (
     <div className="grid lg:grid-cols-[1.15fr,2fr] gap-6">
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Mã giảm giá</h2>
+        <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Mã giảm giá</h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
           Tạo mã % hoặc số tiền cố định. Khách nhập mã ở bước thanh toán (checkout).
         </p>
@@ -308,7 +308,7 @@ export default function AdminCouponsPage() {
               type="submit"
               className={
                 "px-4 py-2 rounded-xl text-sm font-semibold " +
-                (theme === "dark" ? "bg-cyan-600 text-white hover:bg-cyan-500" : "bg-rose-600 text-white hover:bg-rose-700")
+                (theme === "dark" ? "bg-cyan-600 text-on-accent hover:bg-cyan-500" : "bg-rose-600 text-on-accent hover:bg-rose-700")
               }
             >
               {editing?._id ? "Cập nhật" : "Tạo mã"}

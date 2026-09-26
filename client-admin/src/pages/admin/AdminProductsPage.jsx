@@ -18,7 +18,7 @@ const makeGalleryId = () => `g-${Date.now()}-${Math.random().toString(36).slice(
 
 /** @typedef {{ id: string, kind: 'existing', url: string } | { id: string, kind: 'new', file: File, objectUrl: string }} GalleryItem */
 
-const thumbBtn = "absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center hover:bg-red-600";
+const thumbBtn = "absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-500 text-on-accent text-xs flex items-center justify-center hover:bg-red-600";
 const reorderCol =
   "absolute left-0.5 top-1/2 -translate-y-1/2 flex flex-col gap-0.5";
 
@@ -72,14 +72,14 @@ function AdminSuggestCombo({
       return (
         "px-3 py-2.5 text-sm cursor-pointer transition-colors " +
         (picked
-          ? "bg-blue-600 text-white font-medium"
-          : "text-slate-100 hover:bg-blue-600 hover:text-white")
+          ? "bg-blue-600 text-on-accent font-medium"
+          : "text-slate-100 hover:bg-blue-600 hover:text-fg")
       );
     }
     return (
       "px-3 py-2.5 text-sm cursor-pointer transition-colors " +
       (picked
-        ? "bg-rose-600 text-white font-medium"
+        ? "bg-rose-600 text-on-accent font-medium"
         : "text-slate-800 hover:bg-rose-100")
     );
   };
@@ -109,7 +109,7 @@ function AdminSuggestCombo({
           className={
             "absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 outline-none focus-visible:ring-2 " +
             (theme === "dark"
-              ? "text-slate-200 hover:text-white focus-visible:ring-cyan-400"
+              ? "text-slate-200 hover:text-fg focus-visible:ring-cyan-400"
               : "text-slate-600 hover:text-rose-700 focus-visible:ring-rose-400")
           }
           onClick={() => setOpen((o) => !o)}
@@ -424,9 +424,9 @@ export default function AdminProductsPage() {
   return (
     <div className="grid md:grid-cols-[1.2fr,2fr] gap-6">
       <div className="space-y-3 min-w-0">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
           Quản lý mô hình / figure (Admin)
-        </h2>
+        </h1>
         {formNotice ? (
           <div
             role="alert"
@@ -607,7 +607,7 @@ export default function AdminProductsPage() {
                           type="button"
                           disabled={idx === 0}
                           onClick={() => moveGalleryItem(item.id, -1)}
-                          className="w-4 h-4 rounded bg-slate-900/85 text-[10px] text-white leading-none disabled:opacity-30 hover:bg-slate-700"
+                          className="w-4 h-4 rounded bg-slate-900/85 text-[10px] text-fg leading-none disabled:opacity-30 hover:bg-slate-700"
                           title="Lên trước"
                         >
                           ↑
@@ -616,7 +616,7 @@ export default function AdminProductsPage() {
                           type="button"
                           disabled={idx === galleryItems.length - 1}
                           onClick={() => moveGalleryItem(item.id, 1)}
-                          className="w-4 h-4 rounded bg-slate-900/85 text-[10px] text-white leading-none disabled:opacity-30 hover:bg-slate-700"
+                          className="w-4 h-4 rounded bg-slate-900/85 text-[10px] text-fg leading-none disabled:opacity-30 hover:bg-slate-700"
                           title="Xuống sau"
                         >
                           ↓
@@ -632,7 +632,7 @@ export default function AdminProductsPage() {
                         ✕
                       </button>
                       {idx === 0 && (
-                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-black/60 text-[9px] text-white">
+                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 px-1 rounded bg-black/60 text-[9px] text-fg">
                           Chính
                         </span>
                       )}
@@ -650,7 +650,7 @@ export default function AdminProductsPage() {
             "px-4 py-2 rounded-xl text-sm font-semibold transition " +
             (theme === "dark"
               ? "bg-cyan-500 text-slate-950 hover:bg-cyan-400"
-              : "bg-rose-500 text-white hover:bg-rose-600")
+              : "bg-rose-500 text-on-accent hover:bg-rose-600")
           }
         >
           {editing?._id ? "Lưu thay đổi" : "Thêm sản phẩm"}
@@ -674,9 +674,9 @@ export default function AdminProductsPage() {
 
        <div className="space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 shrink-0">
             Danh sách mô hình
-          </h3>
+          </h2>
           <input
             type="search"
             value={listSearch}

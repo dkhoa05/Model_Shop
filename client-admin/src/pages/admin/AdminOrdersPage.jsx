@@ -102,9 +102,9 @@ export default function AdminOrdersPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
+        <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">
           Quản lý đơn hàng (Admin)
-        </h2>
+        </h1>
         <button
           onClick={fetchOrders}
           className={
