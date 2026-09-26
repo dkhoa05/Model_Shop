@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import SafeImg from "@/components/SafeImg";
 import { blogs } from "@/data/blogs";
 
 interface BlogDetailPageProps {
@@ -32,18 +34,27 @@ export default function BlogDetailPage({ params }: BlogDetailPageProps) {
   }
 
   return (
-    <article className="mx-auto max-w-3xl">
-      <nav className="mb-6 text-sm font-bold text-zinc-500" aria-label="Breadcrumb">
-        Home / Blog / <span className="text-zinc-300">{blog.title}</span>
-      </nav>
-      <p className="text-xs font-black uppercase tracking-[0.24em] text-red-400">{blog.tag}</p>
-      <h1 className="mt-3 font-space-grotesk text-4xl font-black uppercase leading-tight text-white">{blog.title}</h1>
-      <p className="mt-4 text-sm font-bold text-zinc-500">{new Date(blog.date).toLocaleDateString("vi-VN")} · {blog.readTime}</p>
-      <img src={blog.image} alt={blog.title} className="mt-8 aspect-[16/9] w-full rounded-xl object-cover" />
-      <div className="mt-8 space-y-5 text-base leading-8 text-zinc-300">
-        {blog.content.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
-        ))}
+    <article className="container-page py-10">
+      <div className="mx-auto max-w-3xl">
+        <nav aria-label="Đường dẫn" className="text-sm text-zinc-400">
+          <ol className="flex flex-wrap gap-2">
+            <li>
+              <Link href="/blog" className="hover:text-fg">Góc builder</Link>
+            </li>
+            <li aria-hidden>/</li>
+            <li aria-current="page" className="text-fg">{blog.title}</li>
+          </ol>
+        </nav>
+        <h1 className="mt-6 text-3xl font-extrabold leading-tight tracking-tight text-fg sm:text-5xl">{blog.title}</h1>
+        <p className="mt-4 text-sm text-zinc-400">
+          {blog.category} · {new Date(blog.date).toLocaleDateString("vi-VN")} · {blog.readTime}
+        </p>
+        <SafeImg src={blog.image} alt="" className="mt-8 aspect-[16/9] w-full rounded-[24px] object-cover" />
+        <div className="mt-10 space-y-6 text-lg leading-9 text-zinc-200">
+          {blog.content.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </div>
       </div>
     </article>
   );
