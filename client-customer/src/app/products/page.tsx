@@ -4,6 +4,9 @@ import ProductGrid from "@/components/ProductGrid";
 import ProductSort from "@/components/ProductSort";
 import { getFilteredProductsFromList, getProductsFromApi, ProductSearchParams } from "@/lib/products";
 
+// Danh sách phụ thuộc bộ lọc (searchParams) và API → luôn render theo yêu cầu, không tiền-render lúc build
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Products - Gundam, Figure, Model Kit",
   description: "Danh sách sản phẩm Gundam, Figure Anime, Tools và Collectibles với filter, sort và giá VND rõ ràng.",
