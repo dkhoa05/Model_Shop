@@ -10,6 +10,18 @@ Cửa hàng mô hình (Gundam, Figure, Model Kit) gồm 3 thành phần tách bi
 
 Kế hoạch đã thực hiện và quyết định thiết kế: [docs/PRODUCTION_PLAN.md](docs/PRODUCTION_PLAN.md).
 
+## Chạy thử nhanh (không cần cài MongoDB)
+
+```bash
+npm install
+npm run demo              # API + MongoDB trong bộ nhớ + dữ liệu mẫu (http://localhost:5000); dữ liệu mất khi tắt
+npm run dev:customer      # Web khách  http://localhost:3000   (terminal khác)
+npm run dev:admin         # Admin      http://localhost:5174   (terminal khác)
+```
+
+Tài khoản mẫu (mật khẩu chung `Admin@123`): `admin@modelshop.com`, `staff1@modelshop.com` (bán hàng/kho), `accountant1@modelshop.com` (kế toán), `user1@modelshop.com`, `user2@modelshop.com` (khách).
+Dữ liệu mẫu có sẵn 69 sản phẩm, đơn hàng ở nhiều trạng thái, chi phí, sổ kế toán, thông tin nhận tiền **demo** (chuyển khoản + MoMo) và mã giảm giá `WELCOME10`, `MODEL50K`.
+
 ## Chạy local (dev)
 
 Yêu cầu: Node 22+, một MongoDB (local hoặc Atlas).
@@ -36,7 +48,7 @@ Dữ liệu mẫu (chỉ dev, **xóa và ghi đè dữ liệu**): `npm run seed 
 ## Kiểm tra chất lượng
 
 ```bash
-npm test               # 21 test tích hợp (Mongo replica set trong bộ nhớ, tự tải mongod lần đầu)
+npm test               # 23 test tích hợp (Mongo replica set trong bộ nhớ, tự tải mongod lần đầu)
 npm run typecheck      # TypeScript web khách
 npm run check          # typecheck + test + build
 ```
