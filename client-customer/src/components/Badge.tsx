@@ -1,13 +1,14 @@
 import { BadgeType } from "@/types/product";
 
+// Huy hiệu: nhãn chữ (không chỉ dựa vào màu) với cặp màu đạt tương phản AA
 const badgeStyles: Record<BadgeType, string> = {
-  new: "bg-emerald-400 text-zinc-950",
-  hot: "bg-amber-400 text-zinc-950",
-  sale: "bg-red-600 text-white",
-  "pre-order": "bg-cyan-400 text-zinc-950",
-  limited: "bg-violet-500 text-white"
+  new: "border border-emerald-400 bg-zinc-950/80 text-emerald-300 backdrop-blur",
+  hot: "bg-accent text-on-accent",
+  sale: "bg-accent text-on-accent",
+  "pre-order": "bg-zinc-100 text-zinc-950",
+  limited: "border border-accent bg-zinc-950/80 text-accent-text backdrop-blur"
 };
 
 export default function Badge({ text, type }: { text: string; type: BadgeType }) {
-  return <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-black uppercase tracking-wider ${badgeStyles[type]}`}>{text}</span>;
+  return <span className={`inline-flex rounded-md px-2 py-1 text-[11px] font-extrabold leading-none ${badgeStyles[type]}`}>{text}</span>;
 }

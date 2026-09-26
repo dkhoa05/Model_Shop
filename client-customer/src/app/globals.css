@@ -2,138 +2,242 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --shop-bg: #09090b;
-  --shop-panel: #151519;
-  --shop-panel-soft: #1c1c21;
-  --shop-border: #2a2a31;
-  --shop-text: #f5f5f7;
-  --shop-muted: #a1a1aa;
-  --shop-red: #ef233c;
-  --shop-red-dark: #c1121f;
-  --shop-cyan: #22d3ee;
-  --shop-amber: #fbbf24;
+/* ==========================================================================
+   Token (RGB không kèm rgb() để dùng được alpha: rgb(var(--x) / .5))
+   Chủ đề: [data-theme="dark"] (mặc định) và [data-theme="light"].
+   Tương phản đã kiểm tra WCAG AA: chữ 400 trên nền >= 6.9:1, chữ 500 >= 4.9:1,
+   nút nhấn (chữ tối trên cam) 6.6:1, accent-text >= 5.3:1.
+   ========================================================================== */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --z-50: 245 246 248;
+  --z-100: 233 236 241;
+  --z-200: 217 221 228;
+  --z-300: 192 197 206;
+  --z-400: 160 166 178;
+  --z-500: 128 135 148;
+  --z-600: 96 103 116;
+  --z-700: 52 57 67;
+  --z-800: 36 40 48;
+  --z-900: 22 25 31;
+  --z-950: 14 16 20;
+  --fg: 245 246 248;
+  --accent: 255 107 61;
+  --accent-strong: 214 78 36;
+  --accent-fg: 20 17 15;
+  --accent-text: 255 143 107;
+  --ok: 34 197 94;
+  --ok-text: 74 222 128;
+  --warn: 245 158 11;
+  --warn-text: 251 191 36;
+  --danger-text: 252 129 129;
+  --glow: 255 107 61;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --z-50: 14 16 20;
+  --z-100: 24 27 33;
+  --z-200: 38 42 50;
+  --z-300: 58 64 75;
+  --z-400: 78 85 98;
+  --z-500: 96 103 116;
+  --z-600: 120 127 140;
+  --z-700: 199 204 213;
+  --z-800: 224 227 233;
+  --z-900: 255 255 255;
+  --z-950: 245 246 248;
+  --fg: 14 16 20;
+  --accent: 255 107 61;
+  --accent-strong: 184 57 15;
+  --accent-fg: 20 17 15;
+  --accent-text: 184 57 15;
+  --ok: 21 128 61;
+  --ok-text: 21 128 61;
+  --warn: 180 83 9;
+  --warn-text: 146 84 7;
+  --danger-text: 185 28 28;
+  --glow: 255 107 61;
 }
 
 @layer base {
   html {
     scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    background: var(--shop-bg);
-    color: var(--shop-text);
+    @apply bg-zinc-950 text-fg antialiased;
+    font-feature-settings: "tnum" 1, "cv11" 1;
     overflow-x: hidden;
+  }
+
+  /* Tiêu đề: một hệ chữ, phân cấp bằng cỡ + độ đậm */
+  h1,
+  h2,
+  h3 {
+    @apply tracking-tight;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Vòng focus rõ ràng cho mọi điều khiển (WCAG 2.4.7 / 2.4.11) */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 3px solid rgb(var(--accent));
+    outline-offset: 3px;
+    border-radius: 0.5rem;
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.85);
+    color: rgb(var(--accent-fg));
+  }
+
+  img {
+    @apply select-none;
   }
 }
 
 @layer components {
+  /* Bề mặt thẻ: một quy ước bo góc (thẻ 20px, điều khiển 12px) */
+  .surface {
+    @apply rounded-[20px] border border-zinc-800 bg-zinc-900;
+  }
+
+  .surface-soft {
+    @apply rounded-[20px] border border-zinc-800/70 bg-zinc-900/60;
+  }
+
   .input {
-    @apply w-full rounded-xl border border-[color:var(--shop-border)] bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-[color:var(--shop-red)];
+    @apply min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base text-fg outline-none transition placeholder:text-zinc-500 sm:text-sm;
   }
 
-  .input:focus {
-    box-shadow: 0 0 0 2px rgba(239, 35, 60, 0.16);
+  .input:hover {
+    @apply border-zinc-600;
   }
 
-  .collector-page {
-    background: var(--shop-bg);
+  .input:focus-visible {
+    @apply border-accent;
+    outline: 3px solid rgb(var(--accent) / 0.45);
+    outline-offset: 0;
   }
 
-  .collector-section {
-    @apply -mx-4 px-4 py-16 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 2xl:-mx-16 2xl:px-16;
+  .input[aria-invalid="true"] {
+    border-color: rgb(var(--danger-text));
   }
 
-  .collector-panel {
-    @apply rounded-2xl border border-[color:var(--shop-border)] bg-[color:var(--shop-panel)];
+  .menu-item {
+    @apply flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-800 hover:text-fg;
   }
 
-  .collector-card {
-    @apply rounded-2xl border border-[color:var(--shop-border)] bg-[color:var(--shop-panel)];
+  /* Liên kết phủ toàn thẻ (vùng bấm lớn, vẫn giữ một liên kết cho trình đọc màn hình) */
+  .stretched-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 10;
   }
 
-  .product-shadow {
-    filter: drop-shadow(0 18px 36px rgba(0, 0, 0, 0.38));
+  .stretched-link:focus-visible {
+    outline-offset: -3px;
+  }
+
+  .link {
+    @apply font-semibold text-accent-text underline decoration-accent-text/40 underline-offset-4 transition hover:decoration-accent-text;
+  }
+
+  .container-page {
+    @apply mx-auto w-full max-w-[1400px] px-4 sm:px-6 lg:px-10;
+  }
+
+  .kicker {
+    @apply text-sm font-semibold text-accent-text;
+  }
+
+  /* Đường viền phát sáng theo con trỏ (chỉ dùng CSS var, không re-render React) */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .spotlight::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--glow) / 0.16), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .spotlight:hover::before,
+  .spotlight:focus-within::before {
+    opacity: 1;
+  }
+
+  .skeleton {
+    background: linear-gradient(100deg, rgb(var(--z-800)) 30%, rgb(var(--z-700) / 0.7) 50%, rgb(var(--z-800)) 70%);
+    background-size: 300% 100%;
+    @apply animate-shimmer rounded-xl;
+  }
+
+  .sr-only-focusable:not(:focus):not(:focus-within) {
+    @apply sr-only;
   }
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #09090b;
+  background: rgb(var(--z-950));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
+  background: rgb(var(--z-700));
   border-radius: 999px;
+  border: 2px solid rgb(var(--z-950));
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--shop-red);
+  background: rgb(var(--accent));
 }
 
-.cyber-grid {
+/* Lưới nền tinh tế, chỉ ở vùng hero (không dùng lớp nhiễu toàn trang) */
+.hero-grid {
   background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 42px 42px;
-  background-color: var(--shop-bg);
+    linear-gradient(to right, rgb(var(--z-50) / 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(var(--z-50) / 0.05) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 70% at 30% 30%, #000 30%, transparent 75%);
 }
 
-.premium-noise {
-  position: relative;
-}
-
-.premium-noise::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.58;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(239, 35, 60, 0.16), transparent 28%),
-    radial-gradient(circle at 88% 18%, rgba(34, 211, 238, 0.08), transparent 32%),
-    radial-gradient(circle at 55% 95%, rgba(251, 191, 36, 0.08), transparent 26%);
-}
-
-.hero-kenburns {
-  animation: heroKenburns 16s ease-in-out infinite alternate;
-}
-
-.float-slow {
-  animation: floatSlow 5s ease-in-out infinite;
-}
-
-@keyframes heroKenburns {
-  from {
-    transform: scale(1);
-  }
-  to {
-    transform: scale(1.055) translate3d(1%, -0.5%, 0);
-  }
-}
-
-@keyframes floatSlow {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
+/* Tôn trọng giảm chuyển động: tắt mọi hoạt ảnh/chuyển tiếp, marquee đứng yên */
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
     transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .surface,
+  .input {
+    border-color: CanvasText;
   }
 }
