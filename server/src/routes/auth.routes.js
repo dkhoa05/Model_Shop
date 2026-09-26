@@ -94,8 +94,19 @@ router.post("/logout", (req, res) => {
   return res.json({ message: "Đã đăng xuất" });
 });
 
+/** Không trả các trường nội bộ (tokenVersion, reset token, __v) */
+function publicUser(u) {
+  const o = typeof u.toObject === "function" ? u.toObject() : { ...u };
+  delete o.password;
+  delete o.tokenVersion;
+  delete o.resetToken;
+  delete o.resetTokenExpiry;
+  delete o.__v;
+  return o;
+}
+
 router.get("/me", auth, (req, res) => {
-  return res.json(req.user);
+  return res.json(publicUser(req.user));
 });
 
 router.put("/me", auth, async (req, res) => {
@@ -130,7 +141,7 @@ router.put("/me", auth, async (req, res) => {
         defaultPaymentMethod: nextDefault
       },
       { new: true }
-    ).select("-password");
+    ).select("-password -tokenVersion -resetToken -resetTokenExpiry -__v");
     return res.json(updated);
   } catch (error) {
     return res.status(500).json({ message: "Server error" });
