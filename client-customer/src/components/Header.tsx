@@ -10,6 +10,7 @@ import { useCart } from "@/context/CartContext";
 import { searchProductsFromApi } from "@/lib/products";
 import type { Product } from "@/types/product";
 import { formatVND } from "@/utils/currency";
+import SafeImg from "@/components/SafeImg";
 
 export default function Header() {
   const pathname = usePathname();
@@ -91,7 +92,7 @@ export default function Header() {
             <div className="absolute right-0 top-12 w-full overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl">
               {results.map((product) => (
                 <Link key={product.id} href={`/product/${product.slug}`} className="flex gap-3 border-b border-zinc-900 p-3 last:border-0 hover:bg-zinc-900" onClick={() => setQuery("")}>
-                  <img src={product.images[0]} alt={product.name} className="h-12 w-12 rounded-lg object-cover" />
+                  <SafeImg src={product.images[0]} alt={product.name} className="h-12 w-12 rounded-lg object-cover" />
                   <span className="min-w-0">
                     <span className="block truncate text-xs font-bold text-white">{product.name}</span>
                     <span className="mt-1 block text-xs font-black text-red-400">{formatVND(product.price)}</span>
@@ -118,7 +119,7 @@ export default function Header() {
             </button>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">Đã thêm vào giỏ</p>
             <div className="mt-3 flex gap-3">
-              <img src={cartNotice.product.images[0]} alt={cartNotice.product.name} className="h-14 w-14 rounded-lg object-cover" />
+              <SafeImg src={cartNotice.product.images[0]} alt={cartNotice.product.name} className="h-14 w-14 rounded-lg object-cover" />
               <div className="min-w-0">
                 <p className="line-clamp-2 text-sm font-bold">{cartNotice.product.name}</p>
                 <p className="mt-1 text-xs text-zinc-400">Số lượng: {cartNotice.quantity}</p>

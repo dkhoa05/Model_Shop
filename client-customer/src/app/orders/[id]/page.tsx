@@ -9,6 +9,7 @@ import { apiFetch } from "@/lib/api";
 import { getGuestOrderToken } from "@/lib/guestOrders";
 import PaymentPanel from "@/components/PaymentPanel";
 import { formatVND } from "@/utils/currency";
+import SafeImg from "@/components/SafeImg";
 
 interface ApiOrderItem {
   product?: {
@@ -151,7 +152,7 @@ export default function OrderDetailPage() {
             <article key={`${item.product?._id || index}`} className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
               <div className="flex gap-4">
                 <Link href="/products" className="h-24 w-24 overflow-hidden rounded-xl bg-zinc-950">
-                  <img src={item.product?.images?.[0] || "https://images.unsplash.com/photo-1612400200701-847d015ba101?auto=format&fit=crop&q=85&w=800"} alt={item.product?.name || "Sản phẩm"} className="h-full w-full object-cover" />
+                  <SafeImg src={item.product?.images?.[0]} alt={item.product?.name || "Sản phẩm"} className="h-full w-full object-cover" />
                 </Link>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black uppercase tracking-wide text-cyan-300">{item.product?.brand || "ModelShop"}</p>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import CheckoutForm from "@/components/CheckoutForm";
 import EmptyState from "@/components/EmptyState";
 import { useCart } from "@/context/CartContext";
+import ProductImage from "@/components/ProductImage";
 import { formatVND } from "@/utils/currency";
 
 export default function CheckoutPage() {
@@ -46,12 +47,12 @@ export default function CheckoutPage() {
           <div className="mt-5 grid gap-4">
             {cartItems.map((item) => (
               <div key={item.product.id} className="flex gap-3 border-b border-zinc-800 pb-4">
-                <img src={item.product.images[0]} alt={item.product.name} className="h-16 w-16 rounded-lg object-cover" />
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-zinc-950"><ProductImage src={item.product.images[0]} alt={item.product.name} sizes="64px" className="object-cover" /></div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold text-white">{item.product.name}</p>
                   <p className="mt-1 text-xs text-zinc-500">Qty {item.quantity}</p>
                 </div>
-                <p className="text-sm font-black text-red-400">{formatVND(item.product.price * item.quantity)}</p>
+                <p className="shrink-0 text-sm font-black text-red-400">{formatVND(item.product.price * item.quantity)}</p>
               </div>
             ))}
           </div>
