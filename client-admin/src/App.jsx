@@ -291,13 +291,34 @@ function AccountingView() {
   const [invoices, setInvoices] = React.useState([]);
   const [accounts, setAccounts] = React.useState([]);
   const [entries, setEntries] = React.useState([]);
+  const [lockedUntil, setLockedUntil] = React.useState(null);
+  const [lockInput, setLockInput] = React.useState("");
   const load = React.useCallback(() => {
+    api.get("/admin/accounting/lock").then((res) => setLockedUntil(res.data.lockedUntil)).catch(() => undefined);
     api.get("/orders").then((res) => setOrders(res.data)).catch(() => setOrders([]));
     api.get("/admin/invoices").then((res) => setInvoices(res.data)).catch(() => setInvoices([]));
     api.get("/admin/accounts").then((res) => setAccounts(res.data)).catch(() => setAccounts([]));
     api.get("/admin/journal-entries").then((res) => setEntries(res.data)).catch(() => setEntries([]));
   }, []);
   React.useEffect(() => void load(), [load]);
+  const saveLock = async (value) => {
+    try {
+      const res = await api.put("/admin/accounting/lock", { lockedUntil: value });
+      setLockedUntil(res.data.lockedUntil);
+      setLockInput("");
+    } catch (err) {
+      window.alert(err?.response?.data?.message || "Không cập nhật được khóa kỳ");
+    }
+  };
+  const reconcile = async () => {
+    try {
+      const res = await api.post("/admin/accounting/reconcile");
+      window.alert(`Đối soát xong: ${res.data.processed} đơn, ${res.data.expensesPosted} khoản chi, ${res.data.failed} lỗi.`);
+      load();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || "Đối soát thất bại");
+    }
+  };
   const createFromOrder = async (orderId) => { await api.post(`/admin/invoices/from-order/${orderId}`); load(); };
   const markPaid = async (invoiceId) => { await api.put(`/admin/invoices/${invoiceId}`, { status: "paid" }); load(); };
   const requestRefund = async (orderId) => {
@@ -325,6 +346,16 @@ function AccountingView() {
   return (
     <section className="space-y-4">
       <PageHeader title="Accounting" description="Quan ly hoa don, chart of accounts va journal entries." />
+      <Panel title="Khóa kỳ kế toán & đối soát">
+        <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-300">
+          <span>Đã khóa đến: <strong className="text-red-300">{lockedUntil ? new Date(lockedUntil).toLocaleDateString("vi-VN") : "chưa khóa"}</strong></span>
+          <input type="date" className="admin-input h-9" value={lockInput} onChange={(e) => setLockInput(e.target.value)} />
+          <button className="admin-button-secondary" disabled={!lockInput} onClick={() => saveLock(new Date(lockInput + "T23:59:59").toISOString())}>Khóa đến ngày</button>
+          {lockedUntil ? <button className="admin-button-secondary" onClick={() => window.confirm("Mở khóa kỳ kế toán? (chỉ admin)") && saveLock(null)}>Mở khóa</button> : null}
+          <button className="admin-button-secondary" onClick={reconcile}>Đối soát sổ sách</button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">Chứng từ/chi phí có ngày trong kỳ đã khóa không thể thêm, sửa hoặc xóa. Chỉ admin được lùi mốc hoặc mở khóa.</p>
+      </Panel>
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Create invoice from order">
           <div className="space-y-2">
