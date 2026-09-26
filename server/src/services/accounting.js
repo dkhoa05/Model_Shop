@@ -4,6 +4,25 @@ import { JournalEntry } from "../models/JournalEntry.js";
 import { Invoice } from "../models/Invoice.js";
 import { Order } from "../models/Order.js";
 import { Product } from "../models/Product.js";
+import { AccountingSetting } from "../models/AccountingSetting.js";
+
+export class PeriodLockedError extends Error {
+  constructor(lockedUntil) {
+    super(`Kỳ kế toán đã khóa đến ${new Date(lockedUntil).toLocaleDateString("vi-VN")} — không thể ghi/sửa chứng từ trong kỳ này`);
+    this.status = 409;
+  }
+}
+
+export async function getLockedUntil() {
+  const s = await AccountingSetting.findOne().lean();
+  return s?.lockedUntil || null;
+}
+
+/** Ném PeriodLockedError nếu ngày thuộc kỳ đã khóa */
+export async function assertPeriodOpen(date) {
+  const locked = await getLockedUntil();
+  if (locked && new Date(date || Date.now()) <= new Date(locked)) throw new PeriodLockedError(locked);
+}
 
 export const DEFAULT_ACCOUNTS = [
   { code: "111", name: "Cash", type: "asset" },
@@ -46,6 +65,7 @@ export async function postEntry({ refType, refId, description, lines, date, user
     const existing = await JournalEntry.findOne({ refType, refId: String(refId) });
     if (existing) return existing;
   }
+  await assertPeriodOpen(date);
   const resolved = [];
   for (const l of lines) {
     resolved.push({
@@ -125,6 +145,8 @@ export function postInvoiceVoidJournal(invoice, userId) {
 
 /** Chi phí hoạt động: Nợ 641 / Có 111 (ghi lại khi sửa, xóa khi xóa khoản chi) */
 export async function syncExpenseJournal(expense, userId) {
+  const old = await JournalEntry.findOne({ refType: "expense", refId: String(expense._id) }).select("date");
+  if (old) await assertPeriodOpen(old.date);
   await JournalEntry.deleteOne({ refType: "expense", refId: String(expense._id) });
   const amount = Number(expense.amount || 0);
   if (!(amount > 0)) return null;
@@ -141,7 +163,9 @@ export async function syncExpenseJournal(expense, userId) {
   });
 }
 
-export function removeExpenseJournal(expenseId) {
+export async function removeExpenseJournal(expenseId) {
+  const old = await JournalEntry.findOne({ refType: "expense", refId: String(expenseId) }).select("date");
+  if (old) await assertPeriodOpen(old.date);
   return JournalEntry.deleteOne({ refType: "expense", refId: String(expenseId) });
 }
 

@@ -196,3 +196,21 @@ test("phương thức thanh toán chưa cấu hình bị từ chối; hóa đơn
   assert.equal((await call("PUT", `/admin/invoices/${inv.json._id}`, { cookie: accountant, body: { status: "posted" } })).status, 200);
   assert.equal((await call("PUT", `/admin/invoices/${inv.json._id}`, { cookie: accountant, body: { status: "paid" } })).status, 200);
 });
+
+test("khóa kỳ kế toán: chặn chi phí trong kỳ đã khóa; chỉ admin lùi/mở khóa", async () => {
+  const day = 24 * 60 * 60 * 1000;
+  const yesterday = new Date(Date.now() - day).toISOString();
+  const lastWeek = new Date(Date.now() - 7 * day).toISOString();
+  assert.equal((await call("PUT", "/admin/accounting/lock", { cookie: accountant, body: { lockedUntil: new Date(Date.now() + day).toISOString() } })).status, 400);
+  assert.equal((await call("PUT", "/admin/accounting/lock", { cookie: accountant, body: { lockedUntil: yesterday } })).status, 200);
+
+  const blocked = await call("POST", "/admin/expenses", { cookie: accountant, body: { title: "Cũ", amount: 1000, expenseDate: lastWeek } });
+  assert.equal(blocked.status, 409);
+  const ok = await call("POST", "/admin/expenses", { cookie: accountant, body: { title: "Mới", amount: 1000 } });
+  assert.equal(ok.status, 201);
+
+  // kế toán không được lùi mốc; admin thì được
+  assert.equal((await call("PUT", "/admin/accounting/lock", { cookie: accountant, body: { lockedUntil: lastWeek } })).status, 403);
+  assert.equal((await call("PUT", "/admin/accounting/lock", { cookie: admin, body: { lockedUntil: null } })).status, 200);
+  assert.equal((await call("POST", "/admin/expenses", { cookie: accountant, body: { title: "Cũ", amount: 1000, expenseDate: lastWeek } })).status, 201);
+});

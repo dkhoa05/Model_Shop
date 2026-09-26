@@ -3,7 +3,9 @@ import { auth, isAdmin, isFinance } from "../middlewares/auth.js";
 import { Expense } from "../models/Expense.js";
 import { parseOptionalDayBounds } from "../utils/dateRangeQuery.js";
 import { validateObjectId } from "../utils/validate.js";
-import { removeExpenseJournal, syncExpenseJournal } from "../services/accounting.js";
+import { assertPeriodOpen, removeExpenseJournal, syncExpenseJournal } from "../services/accounting.js";
+
+const lockedResponse = (err, res) => (err?.status === 409 ? res.status(409).json({ message: err.message }) : null);
 
 const router = express.Router();
 router.param("id", validateObjectId);
@@ -18,6 +20,7 @@ router.get("/expenses", auth, isFinance, async (req, res) => {
     const items = await Expense.find(match).sort({ expenseDate: -1, createdAt: -1 });
     return res.json(items);
   } catch (err) {
+    if (lockedResponse(err, res)) return;
     return res.status(500).json({ message: "Server error" });
   }
 });
@@ -31,6 +34,7 @@ router.post("/expenses", auth, isFinance, async (req, res) => {
     const d = expenseDate ? new Date(String(expenseDate)) : new Date();
     if (Number.isNaN(d.getTime())) return res.status(400).json({ message: "Ngày chi không hợp lệ" });
 
+    await assertPeriodOpen(d);
     const item = await Expense.create({
       title: title.trim(),
       amount: Number(amount),
@@ -41,6 +45,7 @@ router.post("/expenses", auth, isFinance, async (req, res) => {
     await syncExpenseJournal(item, req.user?._id);
     return res.status(201).json(item);
   } catch (err) {
+    if (lockedResponse(err, res)) return;
     return res.status(500).json({ message: "Server error" });
   }
 });
@@ -62,22 +67,30 @@ router.put("/expenses/:id", auth, isFinance, async (req, res) => {
       update.expenseDate = d;
     }
 
+    const current = await Expense.findById(req.params.id);
+    if (!current) return res.status(404).json({ message: "Không tìm thấy khoản chi" });
+    await assertPeriodOpen(current.expenseDate);
+    if (update.expenseDate) await assertPeriodOpen(update.expenseDate);
     const item = await Expense.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true });
     if (!item) return res.status(404).json({ message: "Không tìm thấy khoản chi" });
     await syncExpenseJournal(item, req.user?._id);
     return res.json(item);
   } catch (err) {
+    if (lockedResponse(err, res)) return;
     return res.status(500).json({ message: "Server error" });
   }
 });
 
 router.delete("/expenses/:id", auth, isFinance, async (req, res) => {
   try {
+    const existing = await Expense.findById(req.params.id);
+    if (existing) await assertPeriodOpen(existing.expenseDate);
     const item = await Expense.findByIdAndDelete(req.params.id);
     if (!item) return res.status(404).json({ message: "Không tìm thấy khoản chi" });
     await removeExpenseJournal(item._id);
     return res.json({ message: "Đã xóa" });
   } catch (err) {
+    if (lockedResponse(err, res)) return;
     return res.status(500).json({ message: "Server error" });
   }
 });

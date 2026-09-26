@@ -3,6 +3,7 @@ import { auth, isAdmin, isFinance } from "../middlewares/auth.js";
 import { Invoice } from "../models/Invoice.js";
 import { Order } from "../models/Order.js";
 import { Expense } from "../models/Expense.js";
+import { AccountingSetting } from "../models/AccountingSetting.js";
 import { Account } from "../models/Account.js";
 import { JournalEntry } from "../models/JournalEntry.js";
 import {
@@ -12,7 +13,8 @@ import {
   postPaymentJournal,
   postInvoiceVoidJournal,
   syncOrderAccounting,
-  syncExpenseJournal
+  syncExpenseJournal,
+  getLockedUntil
 } from "../services/accounting.js";
 import { validateObjectId } from "../utils/validate.js";
 
@@ -158,6 +160,29 @@ router.put("/invoices/:id", auth, isFinance, async (req, res) => {
     return res.json(invoice);
   } catch (error) {
     return res.status(400).json({ message: "Invalid invoice payload" });
+  }
+});
+
+/** Khóa kỳ kế toán: mọi chứng từ có ngày <= mốc bị khóa. Chỉ cho dời mốc về phía sau (admin mới được mở khóa/lùi mốc). */
+router.get("/accounting/lock", auth, isFinance, async (req, res) => {
+  return res.json({ lockedUntil: await getLockedUntil() });
+});
+
+router.put("/accounting/lock", auth, isFinance, async (req, res) => {
+  try {
+    const raw = req.body?.lockedUntil;
+    const next = raw === null ? null : new Date(String(raw));
+    if (next !== null && Number.isNaN(next.getTime())) return res.status(400).json({ message: "Ngày khóa không hợp lệ" });
+    if (next && next > new Date()) return res.status(400).json({ message: "Không thể khóa kỳ trong tương lai" });
+    const current = await getLockedUntil();
+    const movingBack = current && (next === null || next < new Date(current));
+    if (movingBack && req.user.role !== "admin") {
+      return res.status(403).json({ message: "Chỉ admin mới được mở khóa hoặc lùi mốc khóa kỳ" });
+    }
+    const s = await AccountingSetting.findOneAndUpdate({}, { $set: { lockedUntil: next, lockedBy: req.user._id } }, { upsert: true, new: true });
+    return res.json({ lockedUntil: s.lockedUntil });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error" });
   }
 });
 
