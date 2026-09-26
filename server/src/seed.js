@@ -17,27 +17,18 @@ import { syncOrderAccounting } from "./services/accounting.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-/** Ảnh đúng theo danh mục sản phẩm (Unsplash, free). */
-const IMAGE_BY_CATEGORY = {
-  Gundam: "https://images.unsplash.com/photo-1612400200701-847d015ba101?w=800",
-  Figure: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  Anime: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  "Anime Figure": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  Lego: "https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=800",
-  Game: "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=800",
-  "Game Figure": "https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=800",
-  Marvel: "https://images.unsplash.com/photo-1525182008055-f88b95ff7980?w=800",
-  DC: "https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800",
-  Pokemon: "https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?w=800",
-  Vocaloid: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  "Cute Figure": "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  Manga: "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
-  Collectible: "https://images.unsplash.com/photo-1617791160505-6f00504e3519?w=800",
-  Diorama: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800",
-  "Phụ kiện": "https://images.unsplash.com/photo-1582555172866-f73bb12a2ab3?w=800",
-};
-function getImageUrlByCategory(category) {
-  return IMAGE_BY_CATEGORY[category] || IMAGE_BY_CATEGORY.Figure;
+/**
+ * Ảnh mẫu (Unsplash, miễn phí): chỉ dùng ảnh thật sự là mô hình/figure để bản demo trông đúng chủ đề.
+ * Gundam dùng ảnh RX-78-2; các danh mục còn lại luân phiên giữa 2 ảnh figure. Thay bằng ảnh thật khi đưa vào sản xuất.
+ */
+const GUNDAM_IMAGE = "https://images.unsplash.com/photo-1612400200701-847d015ba101?w=800";
+const FIGURE_IMAGES = [
+  "https://images.unsplash.com/photo-1578632767115-351597cf2477?w=800",
+  "https://images.unsplash.com/photo-1612400200701-847d015ba101?w=800&crop=entropy&fit=crop"
+];
+function getImageUrlByCategory(category, name = "") {
+  if (/gundam/i.test(category)) return GUNDAM_IMAGE;
+  return FIGURE_IMAGES[(name.length + category.length) % FIGURE_IMAGES.length];
 }
 
 export const runSeed = async ({ exit = true } = {}) => {
@@ -135,7 +126,7 @@ export const runSeed = async ({ exit = true } = {}) => {
     { name: "Diorama Forest Base 1/12", price: 540000, category: "Diorama", brand: "Custom", description: "Đế diorama rừng cây 1/12, dùng trưng bày figure hoặc Gundam.", stock: 10 }
   ].map((p) => ({
     ...p,
-    images: [getImageUrlByCategory(p.category)],
+    images: [getImageUrlByCategory(p.category, p.name)],
     variantLabel: p.variantLabel || "",
     availability: p.availability || "in_stock",
     cost: p.cost ?? Math.round((p.price || 0) * 0.6)
@@ -459,7 +450,7 @@ export const runSeed = async ({ exit = true } = {}) => {
     }
   ].map((p) => ({
     ...p,
-    images: [getImageUrlByCategory(p.category)],
+    images: [getImageUrlByCategory(p.category, p.name)],
     variantLabel: p.variantLabel || "",
     availability: p.availability || "in_stock"
   }));
