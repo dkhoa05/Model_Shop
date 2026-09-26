@@ -3,8 +3,9 @@
 import { useState } from "react";
 import CheckoutForm from "@/components/CheckoutForm";
 import EmptyState from "@/components/EmptyState";
-import { useCart } from "@/context/CartContext";
+import { Notice } from "@/components/form";
 import ProductImage from "@/components/ProductImage";
+import { useCart } from "@/context/CartContext";
 import { formatVND } from "@/utils/currency";
 
 export default function CheckoutPage() {
@@ -15,64 +16,66 @@ export default function CheckoutPage() {
 
   if (cartItems.length === 0) {
     return (
-      <EmptyState
-        title="Chưa có sản phẩm để thanh toán"
-        description="Thêm sản phẩm vào giỏ hàng trước khi điền thông tin checkout."
-        actionLabel="Xem sản phẩm"
-        actionHref="/products"
-      />
+      <EmptyState title="Chưa có sản phẩm để thanh toán" description="Thêm sản phẩm vào giỏ hàng trước khi điền thông tin thanh toán." actionLabel="Xem sản phẩm" actionHref="/products" />
     );
   }
 
   return (
     <div className="space-y-6">
-      <nav className="text-sm font-bold text-zinc-500" aria-label="Breadcrumb">
-        Home / Cart / <span className="text-zinc-300">Checkout</span>
-      </nav>
-      <h1 className="font-space-grotesk text-4xl font-black uppercase text-white">Checkout</h1>
+      <h1 className="text-3xl font-extrabold tracking-tight text-fg sm:text-4xl">Thanh toán</h1>
       {syncNotices.length > 0 && (
-        <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
-          {syncNotices.map((notice) => <p key={notice}>{notice}</p>)}
-        </div>
+        <Notice type="info">
+          {syncNotices.map((notice) => (
+            <p key={notice}>{notice}</p>
+          ))}
+        </Notice>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <section className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-5">
-          <h2 className="mb-5 font-space-grotesk text-xl font-black uppercase text-white">Customer information</h2>
+      <div className="grid gap-8 lg:grid-cols-[1fr_26rem]">
+        <section className="rounded-[24px] border border-zinc-800 bg-zinc-900 p-6 sm:p-8" aria-label="Thông tin đặt hàng">
           <CheckoutForm onSummaryChange={setSummary} />
         </section>
 
-        <aside className="h-fit rounded-xl border border-zinc-800 bg-zinc-900/70 p-5 lg:sticky lg:top-28">
-          <h2 className="font-space-grotesk text-xl font-black uppercase text-white">Order summary</h2>
-          <div className="mt-5 grid gap-4">
+        <aside className="h-fit rounded-[24px] border border-zinc-800 bg-zinc-900 p-6 lg:sticky lg:top-24" aria-labelledby="order-summary">
+          <h2 id="order-summary" className="text-xl font-extrabold text-fg">
+            Đơn hàng của bạn
+          </h2>
+          <ul className="mt-5 grid gap-4">
             {cartItems.map((item) => (
-              <div key={item.product.id} className="flex gap-3 border-b border-zinc-800 pb-4">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-zinc-950"><ProductImage src={item.product.images[0]} alt={item.product.name} sizes="64px" className="object-cover" /></div>
+              <li key={item.product.id} className="flex items-center gap-3">
+                <span className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-zinc-800">
+                  <ProductImage src={item.product.images[0]} alt="" sizes="64px" className="object-cover" />
+                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-bold text-white">{item.product.name}</p>
-                  <p className="mt-1 text-xs text-zinc-500">Qty {item.quantity}</p>
+                  <p className="line-clamp-2 text-sm font-semibold text-fg">{item.product.name}</p>
+                  <p className="mt-0.5 text-sm text-zinc-400">Số lượng: {item.quantity}</p>
                 </div>
-                <p className="shrink-0 text-sm font-black text-red-400">{formatVND(item.product.price * item.quantity)}</p>
-              </div>
+                <p className="shrink-0 text-sm font-bold text-fg">{formatVND(item.product.price * item.quantity)}</p>
+              </li>
             ))}
-          </div>
-          <div className="mt-5 grid gap-3 text-sm">
-            <Row label="Subtotal" value={formatVND(subtotal)} />
-            {summary.discount > 0 && <Row label="Discount" value={`- ${formatVND(summary.discount)}`} />}
-            <Row label="Shipping" value={shippingFee === 0 ? "Free" : formatVND(shippingFee)} />
-            <Row label="Total" value={formatVND(total)} strong />
-          </div>
+          </ul>
+          <dl className="mt-6 grid gap-3 border-t border-zinc-800 pt-5 text-[15px]">
+            <div className="flex justify-between text-zinc-300">
+              <dt>Tạm tính</dt>
+              <dd className="font-semibold text-fg">{formatVND(subtotal)}</dd>
+            </div>
+            {summary.discount > 0 && (
+              <div className="flex justify-between text-zinc-300">
+                <dt>Giảm giá</dt>
+                <dd className="font-semibold text-emerald-400">- {formatVND(summary.discount)}</dd>
+              </div>
+            )}
+            <div className="flex justify-between text-zinc-300">
+              <dt>Vận chuyển</dt>
+              <dd className="font-semibold text-fg">{shippingFee === 0 ? "Miễn phí" : formatVND(shippingFee)}</dd>
+            </div>
+            <div className="mt-1 flex items-baseline justify-between border-t border-zinc-800 pt-4">
+              <dt className="font-bold text-fg">Tổng cộng</dt>
+              <dd className="text-2xl font-extrabold text-fg">{formatVND(total)}</dd>
+            </div>
+          </dl>
         </aside>
       </div>
-    </div>
-  );
-}
-
-function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className={`flex justify-between ${strong ? "border-t border-zinc-800 pt-4 text-lg font-black text-white" : "text-zinc-400"}`}>
-      <span>{label}</span>
-      <span className={strong ? "text-red-400" : "font-bold text-zinc-100"}>{value}</span>
     </div>
   );
 }
